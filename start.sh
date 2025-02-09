@@ -1,6 +1,5 @@
 #!/bin/sh
 
-# Ollama server start करें
 ollama serve &
 
 # Wait for Ollama to be ready
