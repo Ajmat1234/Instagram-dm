@@ -1,5 +1,8 @@
 from fastapi import FastAPI
-import ollama
+from ollama import Client  # Correct import
+
+# Ollama client ko port ke saath initialize karein
+client = Client(host='http://localhost:11434')  # Ollama default port
 
 app = FastAPI()
 
@@ -9,5 +12,8 @@ def home():
 
 @app.get("/ask")
 def ask_ai(q: str):
-    response = ollama.chat(model="mistral", messages=[{"role": "user", "content": q}])
-    return {"response": response["message"]["content"]}
+    try:
+        response = client.chat(model="mistral", messages=[{"role": "user", "content": q}])
+        return {"response": response['message']['content']}
+    except Exception as e:
+        return {"error": str(e)}
