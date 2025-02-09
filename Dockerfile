@@ -1,19 +1,19 @@
-# Ollama base image se shuru karein
 FROM docker.io/ollama/ollama:latest
 
-# System dependencies aur Python setup
+# Dependencies install करें
 RUN apt-get update && \
     apt-get install -y python3 python3-pip curl && \
     pip3 install fastapi uvicorn requests python-ollama
 
-# Ollama server start karke Mistral model pull karein (with health check)
-RUN (ollama serve > /dev/null 2>&1 &) && \
-    while ! curl -s http://localhost:11434; do sleep 1; done && \
-    ollama pull mistral
-
-# App ka code copy karein
-COPY main.py /app/main.py
+# start.sh और main.py copy करें
+COPY start.sh main.py /app/
 WORKDIR /app
 
-# Final command - Ollama aur FastAPI ek saath chalayein
-CMD sh -c "ollama serve & uvicorn main:app --host 0.0.0.0 --port 8000"
+# Script को executable बनाएं
+RUN chmod +x start.sh
+
+# Port expose करें
+EXPOSE 8000 11434
+
+# Entrypoint set करें
+CMD ["./start.sh"]
