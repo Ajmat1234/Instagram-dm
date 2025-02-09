@@ -1,19 +1,19 @@
-FROM docker.io/ollama/ollama:latest
+# Ollama base image
+FROM ollama/ollama:latest
 
-# Dependencies install करें
-RUN apt-get update && \
-    apt-get install -y python3 python3-pip curl && \
-    pip3 install fastapi uvicorn requests python-ollama
+# Install Python and dependencies
+RUN apk add --no-cache python3 py3-pip curl
+RUN pip3 install fastapi uvicorn requests python-ollama
 
-# start.sh और main.py copy करें
-COPY start.sh main.py /app/
+# Copy app files
+COPY main.py start.sh /app/
 WORKDIR /app
 
-# Script को executable बनाएं
+# Make script executable
 RUN chmod +x start.sh
 
-# Port expose करें
+# Expose required ports
 EXPOSE 8000 11434
 
-# Entrypoint set करें
+# Start command
 CMD ["./start.sh"]
