@@ -7,11 +7,13 @@ RUN apt-get update && apt-get install -y python3 python3-pip
 # Zaroori Python packages install karein
 RUN pip3 install fastapi uvicorn requests
 
-# Environment variable PORT ko set karein (default port 8000)
+# Agar koi aur steps hain toh unhe add karein (jaise model load karna etc.)
+
+# Default PORT environment variable set karein (agar Railway ya kisi cloud platform me deploy kar rahe hain)
 ENV PORT 8000
 
 # FastAPI app ke liye port expose karein
 EXPOSE 8000
 
 # Command jo app ko run kare
-CMD ["uvicorn", "your_app_name:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["sh", "-c", "uvicorn your_app_name:app --host 0.0.0.0 --port $PORT"]
