@@ -8,7 +8,7 @@ RUN apt-get update && \
 
 # Ollama server start karke Mistral model pull karein
 RUN (ollama serve > /dev/null 2>&1 &) && \
-    sleep 10 && \  # Server start hone ke liye wait
+    sleep 10 && \
     ollama pull mistral
 
 # App ka code copy karein
