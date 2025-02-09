@@ -1,14 +1,15 @@
 #!/bin/sh
 
+# Start Ollama in background
 ollama serve &
 
-# Wait for Ollama to be ready
-until curl -s http://localhost:11434 >/dev/null; do
+# Wait until Ollama is ready
+while ! curl -s http://localhost:11434 >/dev/null; do
   sleep 1
 done
 
-# Mistral model डाउनलोड करें
+# Pull Mistral model
 ollama pull mistral
 
-# FastAPI app start करें
+# Start FastAPI
 uvicorn main:app --host 0.0.0.0 --port 8000
