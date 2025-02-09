@@ -1,17 +1,15 @@
 # Ollama base image se shuru karein
 FROM docker.io/ollama/ollama:latest
 
-# Package list update karein aur Python aur pip install karein
+# Python aur packages install karein
 RUN apt-get update && apt-get install -y python3 python3-pip
-
-# Zaroori Python packages install karein
 RUN pip3 install fastapi uvicorn requests
 
-# Default PORT environment variable set karein (agar Railway ya kisi cloud platform me deploy kar rahe hain)
-ENV PORT 8000
+# Environment variable set karein
+ENV PORT=8000
 
-# FastAPI app ke liye port expose karein
-EXPOSE 8000
+# Port expose karein
+EXPOSE $PORT
 
-# Command jo app ko run kare (sh -c use karte hue port ko interpolate karne ke liye)
-CMD ["sh", "-c", "uvicorn your_app_name:app --host 0.0.0.0 --port $PORT"]
+# CMD ko update karein (main.py ke liye)
+CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT}"]
