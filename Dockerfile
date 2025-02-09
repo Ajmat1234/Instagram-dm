@@ -3,13 +3,14 @@ FROM docker.io/ollama/ollama:latest
 
 # Python aur packages install karein
 RUN apt-get update && apt-get install -y python3 python3-pip
-RUN pip3 install fastapi uvicorn requests
+RUN pip3 install fastapi uvicorn requests python-ollama
 
-# Environment variable set karein
-ENV PORT=8000
+# Mistral model pre-download karein
+RUN ollama pull mistral
 
-# Port expose karein
-EXPOSE $PORT
+# App ka code copy karein
+COPY main.py /app/main.py
+WORKDIR /app
 
-# CMD ko update karein (main.py ke liye)
-CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT}"]
+# Ollama server aur FastAPI ek saath run karein
+CMD sh -c "ollama serve & uvicorn main:app --host 0.0.0.0 --port 8000"
