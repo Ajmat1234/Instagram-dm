@@ -6,9 +6,9 @@ RUN apt-get update && \
     apt-get install -y python3 python3-pip curl && \
     pip3 install fastapi uvicorn requests python-ollama
 
-# Ollama server start karke Mistral model pull karein
+# Ollama server start karke Mistral model pull karein (with health check)
 RUN (ollama serve > /dev/null 2>&1 &) && \
-    sleep 10 && \
+    while ! curl -s http://localhost:11434; do sleep 1; done && \
     ollama pull mistral
 
 # App ka code copy karein
