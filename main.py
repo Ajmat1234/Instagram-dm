@@ -3,11 +3,10 @@ import json
 import time
 import random
 import os
+import base64
 
-# 🔑 Instagram Login Credentials
-USERNAME = "zehra.bloom_"
-PASSWORD = "Ajmat1234@"
-SESSION_FILE = "session.json"  # Yeh file auto-save hoga
+# 🔑 Instagram Login Credentials (use encoded session)
+SESSION_JSON = os.environ.get('SESSION_JSON')  # Environment variable se session load karein
 
 # 🎯 Targeting Settings
 DM_MESSAGES = [
@@ -22,17 +21,25 @@ SEND_DM_INTERVAL = 60  # 1 minute ka gap between DMs
 # 🚀 Login Function
 def login():
     cl = Client()
-    if os.path.exists(SESSION_FILE):
-        cl.load_settings(SESSION_FILE)
+
+    # Decode Base64 session if available
+    if SESSION_JSON:
+        decoded_session = base64.b64decode(SESSION_JSON).decode('utf-8')
+        session_data = json.loads(decoded_session)
+        cl.set_settings(session_data)
         try:
-            cl.login(USERNAME, PASSWORD)
+            cl.login(session_data['username'], session_data['password'])
         except:
             print("⚠️ Session expired, logging in again...")
-            cl.login(USERNAME, PASSWORD)
-            cl.dump_settings(SESSION_FILE)
+            cl.login(session_data['username'], session_data['password'])
+            cl.dump_settings("session.json")
     else:
+        print("⚠️ No session found, logging in...")
+        USERNAME = "zehra.bloom_"
+        PASSWORD = "Ajmat1234@"
         cl.login(USERNAME, PASSWORD)
-        cl.dump_settings(SESSION_FILE)
+        cl.dump_settings("session.json")
+    
     return cl
 
 # 📌 Function to Get Target Users from Feed Reels Comments + Suggestions
