@@ -1,57 +1,75 @@
-import base64
-import json
-import os
 from instagrapi import Client
+import time
+import random
+import json
 
-# Environment variable se session load karein
-SESSION_JSON = os.environ.get('SESSION_JSON')  # Ensure this is set in your environment
+# Instagram Credentials
+USERNAME = "zehra.bloom_"
+PASSWORD = "Ajmat1234@"
 
-# 🔑 Instagram Login Credentials (use encoded session)
-def login():
-    cl = Client()
+# Realistic Device Setup
+bot = Client()
+bot.set_device({
+    "app_version": "312.0.0.25.119",
+    "android_version": 34,
+    "android_release": "14.0.0",
+    "dpi": "480dpi",
+    "resolution": "1080x2400",
+    "manufacturer": "samsung",
+    "device": "SM-S918B",
+    "model": "Galaxy S23 Ultra"
+})
 
-    if SESSION_JSON:
+# Function to handle login
+def handle_login():
+    try:
+        # Normal login without OTP
+        bot.login(USERNAME, PASSWORD)
+        return True
+    except Exception as e:
+        print(f"\n❌ Error: {str(e)}")
+        return False
+
+# Function to get target users from feed reels
+def get_target_users():
+    target_users = set()
+
+    # Fetch 10 latest reels from the user's feed
+    feed_reels = bot.user_feed(bot.user_id, amount=10)
+    for reel in feed_reels:
         try:
-            # Decode Base64 session if available
-            decoded_session = base64.b64decode(SESSION_JSON).decode('utf-8')
-            session_data = json.loads(decoded_session)
-            cl.set_settings(session_data)
-            print("🔑 Session loaded successfully.")
-            return cl  # Session load successful, no need for login
+            comments = bot.media_comments(reel.id, amount=50)  # Check the first 50 comments
+            for comment in comments:
+                if "girl" in comment.user.username.lower() or "queen" in comment.user.username.lower() or comment.user.username.endswith("a"):
+                    target_users.add(comment.user.username)
+        except:
+            pass
 
-        except Exception as e:
-            print(f"⚠️ Error loading session: {e}")
-            print("🔑 Session expired or invalid, logging in again...")
+    # Return list of target users
+    return list(target_users)
 
-    # Agar session nahi hai, toh login karenge
-    USERNAME = "zehra.bloom_"  # Replace with your username
-    PASSWORD = "Ajmat1234@"    # Replace with your password
-    cl.login(USERNAME, PASSWORD)
-    cl.dump_settings("session.json")  # Save session for later use
-    print(f"🔑 Logged in as {USERNAME}")
-    return cl
+# Function to send DMs
+def send_dm(user):
+    DM_MESSAGES = [
+        "Hi!", "Hello!", "Hey there!", "What's up?", "Good morning!"
+    ]
+    message = random.choice(DM_MESSAGES)  # Random message selection
+    try:
+        bot.direct_send(message, [bot.user_id_from_username(user)])
+        print(f"✅ Message sent to {user}")
+    except Exception as e:
+        print(f"❌ DM failed for {user}, Error: {e}")
 
-# Main Bot Function
-def bot():
-    cl = login()
+# Main Execution
+if handle_login():
+    print(f"\n✅ Successfully Logged In! User ID: {bot.user_id}")
+    bot.dump_settings("ig_session.json")  # Save session
 
-    while True:
-        target_users = get_target_users(cl)
-        success_count = 0
+    # Fetch target users and send DMs
+    target_users = get_target_users()
+    for user in target_users:
+        send_dm(user)
+        time.sleep(60)  # Wait for 1 minute before sending the next DM
 
-        for user in target_users:
-            if success_count >= DM_LIMIT:
-                print(f"⚠️ DM limit {DM_LIMIT} reached, resting for {REST_TIME} seconds...")
-                time.sleep(REST_TIME)
-                success_count = 0  # Reset count after rest
-
-            if send_dm(cl, user):
-                success_count += 1
-
-            time.sleep(SEND_DM_INTERVAL)  # Ek minute ka gap between DMs
-
-        print(f"🔄 Next cycle start hoga 3 ghante ke baad...")
-        time.sleep(REST_TIME)
-
-if __name__ == "__main__":
-    bot()
+else:
+    print("❌ Login failed. Please check credentials.")
