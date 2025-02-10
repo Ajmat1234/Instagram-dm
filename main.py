@@ -23,9 +23,16 @@ bot.set_device({
 # Function to handle login
 def handle_login():
     try:
-        # Normal login without OTP
-        bot.login(USERNAME, PASSWORD)
-        return True
+        # Try to login using session file first
+        bot.load_settings("ig_session.json")
+        if bot.is_logged_in:
+            print("\n✅ Using existing session for login.")
+            return True
+        else:
+            # Normal login without OTP
+            bot.login(USERNAME, PASSWORD)
+            bot.dump_settings("ig_session.json")  # Save session after login
+            return True
     except Exception as e:
         print(f"\n❌ Error: {str(e)}")
         return False
@@ -35,6 +42,7 @@ def get_target_users():
     target_users = set()
 
     # Fetch 10 latest posts from the user's feed
+    print("\n🔍 Searching for target users...")
     feed_reels = bot.user_medias(bot.user_id, amount=10)  # Change user_feed to user_medias
     for reel in feed_reels:
         try:
@@ -42,7 +50,8 @@ def get_target_users():
             for comment in comments:
                 if "girl" in comment.user.username.lower() or "queen" in comment.user.username.lower() or comment.user.username.endswith("a"):
                     target_users.add(comment.user.username)
-        except:
+        except Exception as e:
+            print(f"❌ Error fetching comments for reel {reel.id}: {e}")
             pass
 
     # Return list of target users
@@ -55,6 +64,7 @@ def send_dm(user):
     ]
     message = random.choice(DM_MESSAGES)  # Random message selection
     try:
+        print(f"\n✉️ Sending DM to {user}...")
         bot.direct_send(message, [bot.user_id_from_username(user)])
         print(f"✅ Message sent to {user}")
     except Exception as e:
@@ -63,13 +73,15 @@ def send_dm(user):
 # Main Execution
 if handle_login():
     print(f"\n✅ Successfully Logged In! User ID: {bot.user_id}")
-    bot.dump_settings("ig_session.json")  # Save session
 
     # Fetch target users and send DMs
     target_users = get_target_users()
-    for user in target_users:
-        send_dm(user)
-        time.sleep(60)  # Wait for 1 minute before sending the next DM
-
+    if target_users:
+        print(f"\nFound {len(target_users)} target users.")
+        for user in target_users:
+            send_dm(user)
+            time.sleep(60)  # Wait for 1 minute before sending the next DM
+    else:
+        print("❌ No target users found.")
 else:
     print("❌ Login failed. Please check credentials.")
