@@ -25,10 +25,5 @@ EXPOSE 8000 11434
 # Ollama ko service ki tarah run karne ke liye setup karein
 RUN mkdir -p /root/.ollama && echo "Starting Ollama service..."
 
-# Command to start Ollama and API together
-CMD /bin/sh -c "
-    ollama serve & 
-    until ollama list; do sleep 2; done; 
-    ollama pull llama3 && 
-    uvicorn main:app --host 0.0.0.0 --port \${PORT:-8000}
-    "
+# CMD command properly format karein
+CMD ["/bin/sh", "-c", "ollama serve & until ollama list; do sleep 2; done; ollama pull llama3 && uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"]
