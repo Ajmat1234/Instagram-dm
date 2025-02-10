@@ -23,13 +23,14 @@ bot.set_device({
 # Function to handle login
 def handle_login():
     try:
-        # Try to login using session file first
+        # Try to load session from file
         bot.load_settings("ig_session.json")
         if bot.is_logged_in:
             print("\n✅ Using existing session for login.")
             return True
         else:
-            # Normal login without OTP
+            # If no valid session, login normally
+            print("\n🔑 Logging in with credentials...")
             bot.login(USERNAME, PASSWORD)
             bot.dump_settings("ig_session.json")  # Save session after login
             return True
