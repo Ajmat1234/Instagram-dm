@@ -25,18 +25,20 @@ def handle_login():
     try:
         # Try to load session from file if it exists
         bot.load_settings("ig_session.json")
-        if bot.is_logged_in():
-            print("\n✅ Using existing session for login.")
-            return True
-        else:
-            # If no valid session, login normally
-            print("\n🔑 Logging in with credentials...")
+        print("\n✅ Loaded session successfully.")
+        
+        # Try a simple request to check if the session is valid
+        bot.get_me()
+        return True
+    except Exception as e:
+        print("\n❌ Session invalid or expired, logging in...")
+        try:
             bot.login(USERNAME, PASSWORD)
             bot.dump_settings("ig_session.json")  # Save session after login
             return True
-    except Exception as e:
-        print(f"\n❌ Error: {str(e)}")
-        return False
+        except Exception as e:
+            print(f"❌ Error during login: {str(e)}")
+            return False
 
 # Function to get target users from feed reels
 def get_target_users():
