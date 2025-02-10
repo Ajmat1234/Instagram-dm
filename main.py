@@ -23,7 +23,7 @@ bot.set_device({
 # Function to handle login
 def handle_login():
     try:
-        # Try to load session from file
+        # Try to load session from file if it exists
         bot.load_settings("ig_session.json")
         if bot.is_logged_in:
             print("\n✅ Using existing session for login.")
