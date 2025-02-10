@@ -23,3 +23,13 @@ RUN chmod +x /bot.py
 
 # Run the bot script continuously
 CMD ["python3", "/bot.py"]
+...
+
+# अपना Python code copy करें
+COPY . /app
+WORKDIR /app
+
+# Python dependencies install करें (अगर requirements.txt है)
+RUN pip3 install --no-cache-dir -r requirements.txt  # <-- ये line जरूर हो
+
+...
