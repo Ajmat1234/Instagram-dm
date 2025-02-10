@@ -1,3 +1,5 @@
+FROM ubuntu:22.04
+
 RUN apt update && apt install -y wget unzip curl xvfb \
     && wget -q "https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb" -O chrome.deb \
     && apt install -y ./chrome.deb \
