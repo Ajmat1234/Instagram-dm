@@ -1,21 +1,23 @@
-# Alpine-based image use करें (Railway compatible)
-FROM ollama/ollama:latest
+# Python base image (Debian-based)
+FROM python:3.10-slim
 
-# System dependencies
-RUN apk add --no-cache python3 py3-pip curl
+# Install system dependencies
+RUN apt-get update && \
+    apt-get install -y curl && \
+    curl -fsSL https://ollama.com/install.sh | sh
 
-# Python packages
+# Install Python packages
 RUN pip3 install fastapi uvicorn python-ollama
 
-# Copy files
-COPY . /app
+# Copy app files
+COPY main.py start.sh /app/
 WORKDIR /app
 
-# Permissions fix
+# Make script executable
 RUN chmod +x start.sh
 
-# Ports
-EXPOSE 8000
+# Expose ports
+EXPOSE 8000 11434
 
 # Start command
 CMD ["./start.sh"]
