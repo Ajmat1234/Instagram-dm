@@ -60,26 +60,26 @@ def handle_login():
 # Function to get target users from followers and comments
 def get_target_users_from_url(urls):
     target_users = set()
-    
+
     for url in urls:
         try:
             # Extract user ID from the URL
             username = url.split("instagram.com/")[1].split("?")[0]
             user_id = bot.user_id_from_username(username)
 
-            # Fetch followers of the user
+            # Fetch followers of the user (fixed error here)
             followers = bot.user_followers(user_id, amount=100)  # Limit to 100 followers
             for follower in followers:
-                if any(nickname.lower() in follower.username.lower() for nickname in nicknames) or any(follower.username.endswith(ending) for ending in common_endings):
+                if hasattr(follower, 'username') and (any(nickname.lower() in follower.username.lower() for nickname in nicknames) or any(follower.username.endswith(ending) for ending in common_endings)):
                     target_users.add(follower.username)
-            
-            # Fetch latest 10 media and check comments
+
+            # Fetch latest 10 media and check comments (fixed error here)
             feed_reels = bot.user_medias(user_id, amount=10)
             for reel in feed_reels:
                 try:
                     comments = bot.media_comments(reel.id, amount=50)
                     for comment in comments:
-                        if any(nickname.lower() in comment.user.username.lower() for nickname in nicknames) or any(comment.user.username.endswith(ending) for ending in common_endings):
+                        if hasattr(comment.user, 'username') and (any(nickname.lower() in comment.user.username.lower() for nickname in nicknames) or any(comment.user.username.endswith(ending) for ending in common_endings)):
                             target_users.add(comment.user.username)
                 except Exception as e:
                     print(f"❌ Error fetching comments for reel {reel.id}: {e}")
@@ -87,7 +87,7 @@ def get_target_users_from_url(urls):
 
         except Exception as e:
             print(f"❌ Error processing URL {url}: {e}")
-    
+
     return list(target_users)
 
 # Function to send DMs
