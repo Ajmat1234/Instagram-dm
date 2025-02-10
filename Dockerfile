@@ -1,17 +1,25 @@
-# Ollama base image se shuru karein
-FROM docker.io/ollama/ollama:latest
+# Base image set karein (Ollama ke saath)
+FROM ubuntu:latest
 
-# Package list update karein aur Python aur pip install karein
-RUN apt-get update && apt-get install -y python3 python3-pip
+# System update aur zaroori packages install karein
+RUN apt-get update && apt-get install -y \
+    python3 python3-pip curl && \
+    apt-get clean
 
-# Zaroori Python packages install karein
+# FastAPI aur zaroori Python libraries install karein
 RUN pip3 install fastapi uvicorn requests
 
-# Default PORT environment variable set karein
+# Ollama install karein
+RUN curl -fsSL https://ollama.ai/install.sh | sh
+
+# AI model ko pull karein (Llama3 ka example diya hai)
+RUN ollama pull llama3
+
+# Default PORT set karein
 ENV PORT=8000
 
-# FastAPI app ke liye port expose karein
-EXPOSE 8000
+# Port expose karein
+EXPOSE 8000 11434
 
-# Command jo app ko run kare
-CMD exec uvicorn main:app --host 0.0.0.0 --port ${PORT}
+# Pehle Ollama server start karein, fir FastAPI app start karein
+CMD ollama serve & uvicorn main:app --host 0.0.0.0 --port ${PORT}
