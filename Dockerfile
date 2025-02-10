@@ -1,23 +1,17 @@
-# Python base image (Debian-based)
-FROM python:3.10-slim
+# Ollama base image se shuru karein
+FROM docker.io/ollama/ollama:latest
 
-# Install system dependencies
-RUN apt-get update && \
-    apt-get install -y curl && \
-    curl -fsSL https://ollama.com/install.sh | sh
+# Package list update karein aur Python aur pip install karein
+RUN apt-get update && apt-get install -y python3 python3-pip
 
-# Install Python packages
-RUN pip3 install fastapi uvicorn python-ollama
+# Zaroori Python packages install karein
+RUN pip3 install fastapi uvicorn requests
 
-# Copy app files
-COPY main.py start.sh /app/
-WORKDIR /app
+# Default PORT environment variable set karein
+ENV PORT=8000
 
-# Make script executable
-RUN chmod +x start.sh
+# FastAPI app ke liye port expose karein
+EXPOSE 8000
 
-# Expose ports
-EXPOSE 8000 11434
-
-# Start command
-CMD ["./start.sh"]
+# Command jo app ko run kare
+CMD exec uvicorn main:app --host 0.0.0.0 --port ${PORT}
