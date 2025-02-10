@@ -3,14 +3,18 @@ FROM ubuntu:latest
 
 # System update karein aur required packages install karein
 RUN apt-get update && apt-get install -y \
-    python3 python3-pip curl git && \
+    python3 python3-pip python3-venv curl git && \
     apt-get clean
 
+# Virtual Environment banayein aur activate karein
+RUN python3 -m venv /app/venv
+ENV PATH="/app/venv/bin:$PATH"
+
 # Python aur Pip version check karein
-RUN python3 --version && pip3 --version
+RUN python3 --version && pip --version
 
 # FastAPI aur required Python packages install karein
-RUN pip3 install --no-cache-dir fastapi uvicorn requests
+RUN pip install --no-cache-dir fastapi uvicorn requests
 
 # Ollama install karein
 RUN curl -fsSL https://ollama.ai/install.sh | sh
