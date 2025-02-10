@@ -1,6 +1,7 @@
 FROM ubuntu:22.04
 
-RUN apt update && apt install -y wget unzip curl xvfb \
+# Install dependencies
+RUN apt update && apt install -y wget unzip curl xvfb python3 python3-pip \
     && wget -q "https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb" -O chrome.deb \
     && apt install -y ./chrome.deb \
     && rm chrome.deb \
@@ -10,3 +11,15 @@ RUN apt update && apt install -y wget unzip curl xvfb \
     && unzip chromedriver.zip \
     && mv chromedriver /usr/local/bin/ \
     && rm -f chromedriver.zip latest_version.txt
+
+# Install Python libraries
+RUN pip3 install requests
+
+# Add your bot script
+COPY bot.py /bot.py
+
+# Make the bot.py executable
+RUN chmod +x /bot.py
+
+# Run the bot script continuously
+CMD ["python3", "/bot.py"]
