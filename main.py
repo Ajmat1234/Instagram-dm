@@ -34,8 +34,8 @@ def handle_login():
 def get_target_users():
     target_users = set()
 
-    # Fetch 10 latest reels from the user's feed
-    feed_reels = bot.user_feed(bot.user_id, amount=10)
+    # Fetch 10 latest posts from the user's feed
+    feed_reels = bot.user_medias(bot.user_id, amount=10)  # Change user_feed to user_medias
     for reel in feed_reels:
         try:
             comments = bot.media_comments(reel.id, amount=50)  # Check the first 50 comments
