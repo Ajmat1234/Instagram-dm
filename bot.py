@@ -3,7 +3,17 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 import time
 import random
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 
+def login():
+    # ... existing code ...
+    
+    # Wait for login to complete
+    WebDriverWait(driver, 15).until(
+        EC.presence_of_element_located((By.XPATH, "//div[contains(text(), 'Welcome')]"))
+    )
+    print("✅ Successfully Logged In!")
 # Instagram Credentials
 USERNAME = "zehra.bloom_"
 PASSWORD = "Ajmat1234@"
