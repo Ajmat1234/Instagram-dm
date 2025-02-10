@@ -9,10 +9,8 @@ def home():
 
 @app.get("/chat/")
 def chat(query: str):
-    # Yahan API ka URL daalna hai jo Ollama AI bot se connect kare
     ollama_api_url = "http://localhost:11434/api/generate"
-    
-    # Ollama API ke liye request payload
+
     payload = {
         "model": "llama3",
         "prompt": query
