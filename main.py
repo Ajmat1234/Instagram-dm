@@ -106,9 +106,9 @@ def send_dm(user):
 # Main Execution
 def main():
     urls = [
-        "https://www.instagram.com/bezubanlafz__?igsh=ZG8zZGRnNTVrejcx",
-        "https://www.instagram.com/editz_lover___05?igsh=MTh4b3d5ZmJnYzdi",
-        "https://www.instagram.com/salu____0209?igsh=ZWc2a2NjMGZsaGNt"
+    "bezubanlafz__",
+    "editz_lover___05",
+    "salu____0209"
     ]
 
     if handle_login():
