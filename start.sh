@@ -1,18 +1,15 @@
-#!/bin/sh
+#!/bin/bash
 
-# Ollama start करें
+# Start Ollama
 ollama serve &
 
-# Wait for Ollama (with timeout)
-timeout=30
-while ! curl -s http://localhost:11434 >/dev/null; do
+# Wait for Ollama server
+while ! curl -s http://localhost:11434; do
   sleep 1
-  timeout=$((timeout-1))
-  [ $timeout -le 0 ] && echo "Ollama timeout!" && exit 1
 done
 
-# Model download करें
+# Download model
 ollama pull mistral || echo "Model pull failed, continuing..."
 
-# FastAPI start करें
+# Start FastAPI
 uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}
