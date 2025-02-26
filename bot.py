@@ -4,136 +4,128 @@ import random
 import os
 import base64
 import threading
+from dotenv import load_dotenv  # For local testing
 
 # Configuration
 NOTIFY_MSGS = [
-    "🚀 Attention @{mentions}! Tum sabko bulaya gaya hai! 😎",
-    "🔥 Hello @{mentions}, sabhi yahan dhyan dein! Koi important baat hai! 💬",
-    "👋 @{mentions}, sabko tag kar diya gaya hai! Ab koi ignore nahi kar sakta! 😂",
-    "💥 @{mentions}, bas tumhari kami thi! Ab sabhi yahan hai! 🤩"
+    "🚀 Attention {mentions}! Tum sabko bulaya gaya hai! 😎",
+    "🔥 Hello {mentions}, sabhi yahan dhyan dein! 💬",
+    "👋 {mentions}, sabko tag kar diya gaya hai! 😂",
+    "💥 {mentions}, bas tumhari kami thi! 🤩"
 ]
 
-# Environment Variables
-USERNAME = os.getenv("USERNAME")
-PASSWORD = os.getenv("PASSWORD")
-SESSION_DATA = os.getenv("SESSION_DATA")
+# Improved Error Handling
+MAX_RETRIES = 3
+REQUEST_DELAY = (2, 5)
 
-# Load session file from environment variable
-def load_session_from_env():
-    if SESSION_DATA:
+# Session Management
+SESSION_FILE = "ig_session.json"
+
+def load_session():
+    if os.getenv("SESSION_DATA"):
         try:
-            decoded_data = base64.b64decode(SESSION_DATA)
-            with open("ig_session.json", "wb") as f:
-                f.write(decoded_data)
-            print("📝 Session file decoded aur save ho gaya.")
+            decoded = base64.b64decode(os.getenv("SESSION_DATA"))
+            with open(SESSION_FILE, "wb") as f:
+                f.write(decoded)
+            print("✅ Session loaded from environment")
             return True
         except Exception as e:
-            print(f"❌ SESSION_DATA decode error: {e}")
+            print(f"❌ Session load error: {str(e)}")
             return False
     return False
 
-# Human-like delay function
-def human_delay(min_time=5, max_time=15):
-    delay = random.uniform(min_time, max_time)
-    print(f"⏳ Human-like delay: {round(delay, 2)} seconds")
+def human_delay(min=5, max=15):
+    delay = random.uniform(min, max)
+    print(f"⏳ Waiting {delay:.1f}s")
     time.sleep(delay)
 
-# Get all group members and mention them
-# Get all group members and mention them
-def get_all_members(thread):
-   def get_all_members(thread):
-    mention_list = []
-
-    print(f"🔍 Fetching members for group ID: {thread.id}")
-
-    for user_id in thread.users:
-        if user_id != bot.user_id:
-            try:
-                human_delay(5, 10)  # Delay to avoid spam
+def get_members(thread):
+    members = []
+    print(f"\n🔍 Scanning Group: {thread.id}")
+    
+    try:
+        for user_id in thread.user_ids:
+            if user_id == bot.user_id:
+                continue
                 
-                user_data = bot.user_info(int(user_id))  # ✅ Ensure correct format
-                username = user_data.username  
+            for _ in range(MAX_RETRIES):
+                try:
+                    user = bot.user_info(user_id)
+                    if not user.is_private:
+                        members.append(f"@{user.username}")
+                        print(f"✅ {user.username}")
+                    else:
+                        print(f"🔒 Private: {user.username}")
+                    break
+                except Exception as e:
+                    print(f"⚠️ Error @{user_id}: {str(e)}")
+                    time.sleep(random.uniform(*REQUEST_DELAY))
+                    
+            human_delay(1, 3)
+            
+    except Exception as e:
+        print(f"🚨 Critical error: {str(e)}")
+        
+    return members
 
-                if user_data.is_private:
-                    print(f"🔒 Skipping private user: {username}")
-                    continue
-
-                mention_list.append(f"@{username}")
-                print(f"✅ Found: {username}")
-
-            except Exception as e:
-                print(f"⚠️ Skipping user {user_id}: {e}")
-                continue  
-
-    return mention_list
-
-# Mention users in batches of 10
-def mention_all_members(thread):
-    mention_list = get_all_members(thread)
-
-    if not mention_list:
-        print(f"⚠️ No members found for group ID: {thread.id}")
+def send_mentions(thread):
+    members = get_members(thread)
+    if not members:
         return
 
-    if len(mention_list) > 10:
-        chunks = [mention_list[i:i + 10] for i in range(0, len(mention_list), 10)]
-        for chunk in chunks:
-            mention_text = ", ".join(chunk)
-            message = random.choice(NOTIFY_MSGS).format(mentions=mention_text)
-            bot.direct_answer(thread.id, text=message)
-            print(f"🔔 Sent message to: {mention_text}")
-            human_delay(30, 60)  # Random delay to avoid spam
-    else:
-        mention_text = ", ".join(mention_list)
-        message = random.choice(NOTIFY_MSGS).format(mentions=mention_text)
-        bot.direct_answer(thread.id, text=message)
-        print(f"🔔 Sent message to: {mention_text}")
+    for i in range(0, len(members), 10):
+        batch = members[i:i+10]
+        try:
+            msg = random.choice(NOTIFY_MSGS).format(mentions=", ".join(batch))
+            bot.direct_send(msg, thread_ids=[thread.id])
+            print(f"📩 Sent to {len(batch)} users")
+            human_delay(30, 60)
+        except Exception as e:
+            print(f"❌ Failed to send: {str(e)}")
 
-# Continuous bot function (scanning groups)
-def scan_groups():
+def group_scanner():
     while True:
         try:
-            print(f"\n🌀 Scanning groups at {time.strftime('%H:%M:%S')}")
-            threads = bot.direct_threads(amount=10)  
+            print(f"\n🕒 {time.strftime('%H:%M:%S')} Checking groups...")
+            threads = bot.direct_threads(amount=5)
+            
             for thread in threads:
                 if thread.is_group:
-                    mention_all_members(thread)
-                    human_delay(60, 120)  
-
+                    send_mentions(thread)
+                    human_delay(120, 240)  # Longer delay between groups
+                    
+            human_delay(300, 600)  # 5-10 minute scan interval
+            
         except Exception as e:
-            print(f"⚠️ Error: {str(e)}")
-            human_delay(5, 10)
+            print(f"🔥 Crash: {str(e)}")
+            human_delay(60, 120)
 
-# Start bot function
 def start_bot():
     global bot
     bot = Client()
-
-    if load_session_from_env():
+    
+    # Login Logic
+    if load_session():
         try:
-            bot.load_settings("ig_session.json")
-            human_delay(3, 8)  # Fake human-like action delay
-            bot.get_timeline_feed()  
-            print("✅ Logged in using session!")
+            bot.load_settings(SESSION_FILE)
+            bot.get_timeline_feed()  # Test session
+            print("👍 Session login successful!")
         except:
-            print("❌ Session invalid, manual login kar raha hoon...")
-            bot.login(USERNAME, PASSWORD)
-            human_delay(5, 15)
-            bot.dump_settings("ig_session.json")
+            print("🔑 Session expired, logging in fresh...")
+            bot.login(os.getenv("USERNAME"), os.getenv("PASSWORD"))
+            bot.dump_settings(SESSION_FILE)
     else:
-        print("❌ Session nahi mila, manually login kar rahe hain...")
-        bot.login(USERNAME, PASSWORD)
-        human_delay(5, 15)
-        bot.dump_settings("ig_session.json")
-
-    # Dummy action to make login look human-like
-    print("📢 Sending a random feed request to mimic human behavior...")
-    bot.get_timeline_feed()  
-    human_delay(5, 10)
-
-    print(f"🚀 Bot started: {time.strftime('%d-%m-%Y %H:%M')}")
-    scan_thread = threading.Thread(target=scan_groups)
-    scan_thread.start()
+        print("🔑 New login...")
+        bot.login(os.getenv("USERNAME"), os.getenv("PASSWORD"))
+        bot.dump_settings(SESSION_FILE)
+    
+    # Start scanner
+    threading.Thread(target=group_scanner, daemon=True).start()
+    
+    # Keep alive
+    while True:
+        time.sleep(3600)
 
 if __name__ == "__main__":
+    load_dotenv()  # Remove this line on Railway
     start_bot()
