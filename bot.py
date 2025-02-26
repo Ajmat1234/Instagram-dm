@@ -13,7 +13,7 @@ NOTIFY_MSGS = [
     "💥 @{mentions}, bas tumhari kami thi! Ab sabhi yahan hai! 🤩"
 ]
 
-# Environment Variables (Railway.com ya local environment me set karna hoga)
+# Environment Variables
 USERNAME = os.getenv("USERNAME")
 PASSWORD = os.getenv("PASSWORD")
 SESSION_DATA = os.getenv("SESSION_DATA")
@@ -32,6 +32,12 @@ def load_session_from_env():
             return False
     return False
 
+# Human-like delay function
+def human_delay(min_time=5, max_time=15):
+    delay = random.uniform(min_time, max_time)
+    print(f"⏳ Human-like delay: {round(delay, 2)} seconds")
+    time.sleep(delay)
+
 # Get all group members and mention them
 def mention_all_members(thread):
     mention_list = []
@@ -42,9 +48,10 @@ def mention_all_members(thread):
                 user_data = bot.user_info(user)
                 username = user_data.dict().get("username", "Unknown")
                 mention_list.append(f"@{username}")
+                human_delay(2, 5)  # Small delay for each request
             except Exception as e:
                 print(f"⚠️ Failed to fetch user info: {e}")
-                continue  # Skip users jinka data nahi mil raha
+                continue  
 
     if len(mention_list) > 10:
         chunks = [mention_list[i:i + 10] for i in range(0, len(mention_list), 10)]
@@ -52,7 +59,7 @@ def mention_all_members(thread):
             mention_text = ", ".join(chunk)
             message = random.choice(NOTIFY_MSGS).format(mentions=mention_text)
             bot.direct_answer(thread.id, text=message)
-            time.sleep(3)  
+            human_delay(30, 60)  # Random delay to avoid spam
     else:
         mention_text = ", ".join(mention_list)
         message = random.choice(NOTIFY_MSGS).format(mentions=mention_text)
@@ -65,16 +72,15 @@ def scan_groups():
     while True:
         try:
             print(f"\n🌀 Scanning groups at {time.strftime('%H:%M:%S')}")
-
-            threads = bot.direct_threads(amount=10)  # Check latest 10 groups
+            threads = bot.direct_threads(amount=10)  
             for thread in threads:
                 if thread.is_group:
                     mention_all_members(thread)
-                    time.sleep(60)  # 1 minute delay to avoid spam
+                    human_delay(60, 120)  
 
         except Exception as e:
             print(f"⚠️ Error: {str(e)}")
-            time.sleep(5)
+            human_delay(5, 10)
 
 # Start bot function
 def start_bot():
@@ -84,16 +90,24 @@ def start_bot():
     if load_session_from_env():
         try:
             bot.load_settings("ig_session.json")
-            bot.get_timeline_feed()  # ✅ Session valid hai ya nahi check karne ke liye
+            human_delay(3, 8)  # Fake human-like action delay
+            bot.get_timeline_feed()  
             print("✅ Logged in using session!")
         except:
             print("❌ Session invalid, manual login kar raha hoon...")
             bot.login(USERNAME, PASSWORD)
+            human_delay(5, 15)
             bot.dump_settings("ig_session.json")
     else:
         print("❌ Session nahi mila, manually login kar rahe hain...")
         bot.login(USERNAME, PASSWORD)
+        human_delay(5, 15)
         bot.dump_settings("ig_session.json")
+
+    # Dummy action to make login look human-like
+    print("📢 Sending a random feed request to mimic human behavior...")
+    bot.get_timeline_feed()  
+    human_delay(5, 10)
 
     print(f"🚀 Bot started: {time.strftime('%d-%m-%Y %H:%M')}")
     scan_thread = threading.Thread(target=scan_groups)
