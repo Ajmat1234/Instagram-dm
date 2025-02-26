@@ -39,19 +39,37 @@ def human_delay(min_time=5, max_time=15):
     time.sleep(delay)
 
 # Get all group members and mention them
-def mention_all_members(thread):
+def get_all_members(thread):
     mention_list = []
+
+    print(f"🔍 Fetching members for group ID: {thread.id}")
 
     for user in thread.users:
         if user != bot.user_id:
             try:
                 user_data = bot.user_info(user)
-                username = user_data.dict().get("username", "Unknown")
+                if user_data.is_private:
+                    print(f"🔒 Skipping private user: {user_data.username}")
+                    continue
+                
+                username = user_data.username
                 mention_list.append(f"@{username}")
+                print(f"✅ Found: {username}")
+
                 human_delay(2, 5)  # Small delay for each request
             except Exception as e:
                 print(f"⚠️ Failed to fetch user info: {e}")
                 continue  
+
+    return mention_list
+
+# Mention users in batches of 10
+def mention_all_members(thread):
+    mention_list = get_all_members(thread)
+
+    if not mention_list:
+        print(f"⚠️ No members found for group ID: {thread.id}")
+        return
 
     if len(mention_list) > 10:
         chunks = [mention_list[i:i + 10] for i in range(0, len(mention_list), 10)]
@@ -59,13 +77,13 @@ def mention_all_members(thread):
             mention_text = ", ".join(chunk)
             message = random.choice(NOTIFY_MSGS).format(mentions=mention_text)
             bot.direct_answer(thread.id, text=message)
+            print(f"🔔 Sent message to: {mention_text}")
             human_delay(30, 60)  # Random delay to avoid spam
     else:
         mention_text = ", ".join(mention_list)
         message = random.choice(NOTIFY_MSGS).format(mentions=mention_text)
         bot.direct_answer(thread.id, text=message)
-
-    print(f"🔔 Notification sent to: {mention_list}")
+        print(f"🔔 Sent message to: {mention_text}")
 
 # Continuous bot function (scanning groups)
 def scan_groups():
