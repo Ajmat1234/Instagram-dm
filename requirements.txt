@@ -1,3 +1,4 @@
 instagrapi==1.19.8  # Latest version check karo
 pillow
 python-dotenv
+schedule
