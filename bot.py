@@ -41,6 +41,7 @@ def human_delay(min_time=5, max_time=15):
 # Get all group members and mention them
 # Get all group members and mention them
 def get_all_members(thread):
+   def get_all_members(thread):
     mention_list = []
 
     print(f"🔍 Fetching members for group ID: {thread.id}")
@@ -48,8 +49,10 @@ def get_all_members(thread):
     for user_id in thread.users:
         if user_id != bot.user_id:
             try:
-                user_data = bot.user_info(user_id)  # ✅ Fixed function call
-                username = user_data.username  # ✅ Extract username correctly
+                human_delay(5, 10)  # Delay to avoid spam
+                
+                user_data = bot.user_info(int(user_id))  # ✅ Ensure correct format
+                username = user_data.username  
 
                 if user_data.is_private:
                     print(f"🔒 Skipping private user: {username}")
@@ -58,9 +61,8 @@ def get_all_members(thread):
                 mention_list.append(f"@{username}")
                 print(f"✅ Found: {username}")
 
-                human_delay(2, 5)  # Small delay for each request
             except Exception as e:
-                print(f"⚠️ Failed to fetch user info for ID {user_id}: {e}")
+                print(f"⚠️ Skipping user {user_id}: {e}")
                 continue  
 
     return mention_list
