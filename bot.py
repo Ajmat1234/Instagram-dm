@@ -1,18 +1,31 @@
 from instagrapi import Client
-import json
 import time
 import random
 import os
-from dotenv import load_dotenv
 
-# ---- Load Instagram Credentials ----
-load_dotenv()
-USERNAME = os.getenv("USERNAME")
-PASSWORD = os.getenv("PASSWORD")
+# ---- Instagram Credentials ----
+USERNAME = "Zehra.bloom_"  # Instagram ID
+PASSWORD = "Ajmat1234@"  # Instagram Password
 
 # ---- Instagram Client Setup ----
 bot = Client()
-bot.login(USERNAME, PASSWORD)
+
+# Function to Login
+def login_instagram():
+    try:
+        bot.load_settings("session.json")  # Load previous session
+        bot.login(USERNAME, PASSWORD)
+        print("✅ Logged in using session.")
+    except Exception as e:
+        print(f"⚠️ Session login failed: {e}")
+        try:
+            bot.login(USERNAME, PASSWORD)  # Try normal login
+            bot.dump_settings("session.json")  # Save new session
+            print("✅ Logged in using username-password.")
+        except Exception as e:
+            print(f"❌ Login failed: {e}")
+
+login_instagram()  # Call login function
 
 DM_MESSAGES = [
     "Hey! I saw your profile and just wanted to say hi! 😊",
