@@ -4,12 +4,13 @@ import time
 import random
 import base64
 import os
-from datetime import datetime, timedelta
 from dotenv import load_dotenv
 
 # ---- Load Environment Variables ----
 load_dotenv()
-SESSION_DATA = os.getenv("SESSION_DATA")  # Railway ke ENV me yeh set karna
+SESSION_DATA = os.getenv("SESSION_DATA")  # Railway ke ENV me set karna
+USERNAME = os.getenv("USERNAME")
+PASSWORD = os.getenv("PASSWORD")
 
 # ---- Configuration ----
 BTS_HASHTAGS = ["btsarmy", "btsforever", "btson", "btslove", "btsfan"]
@@ -29,11 +30,12 @@ BREAK_TIME = 14400  # 4 ghante (in seconds)
 # ---- Instagram Client Setup ----
 bot = Client()
 
+# ---- Function to Load Session ----
 def load_session():
     if SESSION_DATA:
         try:
-            decoded_session = json.loads(base64.b64decode(SESSION_DATA).decode())  # Base64 decode + JSON parse
-            bot.load_settings(decoded_session)  # JSON format me load karna
+            decoded_session = json.loads(base64.b64decode(SESSION_DATA).decode())  # Decode + Parse JSON
+            bot.load_settings(decoded_session)  # Dictionary format me load karna
             bot.get_timeline_feed()
             print("✅ Session login successful!")
             return True
@@ -41,17 +43,21 @@ def load_session():
             print(f"❌ Session load error: {str(e)}")
     return False
 
+# ---- Function to Login ----
 def login():
     if load_session():
-        return
+        return  # Agar session load ho gaya, to naya login ki zaroorat nahi
+
     print("🔑 Logging in fresh...")
-    bot.login(os.getenv("USERNAME"), os.getenv("PASSWORD"))
+    bot.login(USERNAME, PASSWORD)
+    
     session_data = bot.get_settings()
     encoded_session = base64.b64encode(json.dumps(session_data).encode()).decode()
+    
     print("🔹 Copy and paste this SESSION_DATA into Railway environment variables:")
     print(encoded_session)
 
-# ---- Function to collect usernames ----
+# ---- Function to Collect Usernames ----
 def collect_usernames():
     usernames = set()
     for hashtag in BTS_HASHTAGS:
@@ -69,7 +75,7 @@ def collect_usernames():
     print(f"✅ Collected {len(usernames)} usernames.")
     return usernames
 
-# ---- Function to filter girl usernames ----
+# ---- Function to Filter Girl Usernames ----
 def filter_girl_usernames():
     try:
         with open(USERNAME_FILE, "r") as f:
@@ -81,7 +87,7 @@ def filter_girl_usernames():
     print(f"🎯 {len(filtered_users)} potential girl accounts found.")
     return filtered_users
 
-# ---- Function to send DMs safely ----
+# ---- Function to Send DMs Safely ----
 def send_dms(usernames):
     count = 0
     for username in usernames:
