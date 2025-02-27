@@ -1,127 +1,98 @@
 from instagrapi import Client
+import json
 import time
 import random
-import os
-import base64
-import threading
-import schedule
-from dotenv import load_dotenv
+from datetime import datetime, timedelta
 
-# Configuration
-NOTIFY_MSGS = [
-    "🚀 Attention {mentions}! Tum sabko bulaya gaya hai! 😎",
-    "🔥 Hello {mentions}, sabhi yahan dhyan dein! 💬",
-    "👋 {mentions}, sabko tag kar diya gaya hai! 😂",
-    "💥 {mentions}, bas tumhari kami thi! 🤩"
+# ---- Configuration ----
+SESSION_DATA = "your_session_data_here"  # Railway ke ENV me yeh set karna
+BTS_HASHTAGS = ["btsarmy", "btsforever", "btson", "btslove", "btsfan"]
+COMMON_GIRL_NAMES = ["priya", "shreya", "anjali", "neha", "pooja", "queen", "baby", "angel", "cutie", "sweetie"]
+DM_MESSAGES = [
+    "Hey! I saw your profile and just wanted to say hi! 😊",
+    "Hi there! Your posts are amazing, keep shining! ✨",
+    "Hello! Just passing by to send you positive vibes! 💕",
+    "Hey! Love your profile, just wanted to drop a compliment! 🌸"
 ]
 
-MAX_RETRIES = 3
-REQUEST_DELAY = (2, 5)
-SESSION_FILE = "ig_session.json"
+USERNAME_FILE = "usernames.json"
+MAX_DAILY_DMS = 20  # Ek baar me sirf 20 DM bhejne hain
+DM_DELAY = 60  # 1 minute ka delay har message ke beech
+BREAK_TIME = 14400  # 4 ghante (in seconds)
 
-def load_session():
-    if os.getenv("SESSION_DATA"):
+# ---- Instagram Client Setup ----
+bot = Client()
+bot.load_settings(SESSION_DATA)
+
+# ---- Function to collect usernames ----
+def collect_usernames():
+    usernames = set()
+
+    for hashtag in BTS_HASHTAGS:
         try:
-            decoded = base64.b64decode(os.getenv("SESSION_DATA"))
-            with open(SESSION_FILE, "wb") as f:
-                f.write(decoded)
-            print("✅ Session loaded from environment")
-            return True
-        except Exception as e:
-            print(f"❌ Session load error: {str(e)}")
-            return False
-    return False
-
-def human_delay(min=5, max=15):
-    delay = random.uniform(min, max)
-    print(f"⏳ Waiting {delay:.1f}s")
-    time.sleep(delay)
-
-def get_members(thread):
-    members = []
-    print(f"\n🔍 Scanning Group: {thread.id}")
-    
-    try:
-        for user in thread.users:
-            if user.pk == bot.user_id:
-                continue
-                
-            for _ in range(MAX_RETRIES):
-                try:
-                    user_info = bot.user_info(user.pk)
-                    if not user_info.is_private:
-                        members.append(f"@{user_info.username}")
-                        print(f"✅ {user_info.username}")
-                    else:
-                        print(f"🔒 Private: {user_info.username}")
-                    break
-                except Exception as e:
-                    print(f"⚠️ Error @{user.pk}: {str(e)}")
-                    time.sleep(random.uniform(*REQUEST_DELAY))
-                    
-            human_delay(1, 3)
+            print(f"🔍 Searching for posts under #{hashtag}...")
+            posts = bot.hashtag_medias_top(hashtag, amount=10)
             
-    except Exception as e:
-        print(f"🚨 Critical error: {str(e)}")
-        
-    return members
-
-def send_mentions(thread):
-    members = get_members(thread)
-    if not members:
-        return
-
-    print("\n✅ All members fetched successfully!")
-    
-    for i in range(0, len(members), 10):
-        batch = members[i:i+10]
-        try:
-            msg = random.choice(NOTIFY_MSGS).format(mentions=", ".join(batch))
-            bot.direct_send(msg, thread_ids=[thread.id])
-            print(f"📩 Sent to {len(batch)} users")
-            time.sleep(60)  # 1-minute delay
+            for post in posts:
+                username = post.user.username.lower()
+                if username not in usernames:
+                    usernames.add(username)
         except Exception as e:
-            print(f"❌ Failed to send: {str(e)}")
+            print(f"⚠️ Error fetching from #{hashtag}: {e}")
 
-def scheduled_mentions():
+    # Save collected usernames
+    with open(USERNAME_FILE, "w") as f:
+        json.dump(list(usernames), f)
+
+    print(f"✅ Collected {len(usernames)} usernames.")
+    return usernames
+
+# ---- Function to filter girl usernames ----
+def filter_girl_usernames():
     try:
-        print(f"\n🕒 {time.strftime('%H:%M:%S')} Checking groups...")
-        threads = bot.direct_threads(amount=5)
-        
-        for thread in threads:
-            if thread.is_group:
-                send_mentions(thread)
-                
-    except Exception as e:
-        print(f"🔥 Crash: {str(e)}")
+        with open(USERNAME_FILE, "r") as f:
+            usernames = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return []
 
-def start_bot():
-    global bot
-    bot = Client()
-    
-    if load_session():
+    filtered_users = [u for u in usernames if any(name in u for name in COMMON_GIRL_NAMES)]
+
+    print(f"🎯 {len(filtered_users)} potential girl accounts found.")
+    return filtered_users
+
+# ---- Function to send DMs safely ----
+def send_dms(usernames):
+    count = 0
+
+    for username in usernames:
+        if count >= MAX_DAILY_DMS:
+            print("🚀 20 DMs sent. Taking a 4-hour break...")
+            time.sleep(BREAK_TIME)
+            count = 0
+
         try:
-            bot.load_settings(SESSION_FILE)
-            bot.get_timeline_feed()
-            print("👍 Session login successful!")
-        except:
-            print("🔑 Session expired, logging in fresh...")
-            bot.login(os.getenv("USERNAME"), os.getenv("PASSWORD"))
-            bot.dump_settings(SESSION_FILE)
-    else:
-        print("🔑 New login...")
-        bot.login(os.getenv("USERNAME"), os.getenv("PASSWORD"))
-        bot.dump_settings(SESSION_FILE)
-    
-    # **Schedule Tasks**
-    schedule.every().day.at("06:00").do(scheduled_mentions)  # सुबह 6 बजे
-    schedule.every().day.at("17:00").do(scheduled_mentions)  # शाम 5 बजे
-    
-    # **Main Loop**
-    while True:
-        schedule.run_pending()
-        time.sleep(60)
+            user_id = bot.user_id_from_username(username)
+            message = random.choice(DM_MESSAGES)
 
+            bot.direct_send(message, [user_id])
+            print(f"✅ DM sent to {username}")
+
+            count += 1
+            time.sleep(DM_DELAY + random.randint(5, 15))  # Safe delay
+
+        except Exception as e:
+            print(f"❌ Could not DM {username}: {e}")
+            continue
+
+# ---- Main Execution ----
 if __name__ == "__main__":
-    load_dotenv()
-    start_bot()
+    while True:
+        print("\n🚀 Starting Instagram BTS DM bot...\n")
+        collect_usernames()
+        girl_usernames = filter_girl_usernames()
+
+        if girl_usernames:
+            send_dms(girl_usernames)
+        else:
+            print("⚠️ No target usernames found. Retrying after 1 hour.")
+            time.sleep(3600)
