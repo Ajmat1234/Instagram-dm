@@ -17,7 +17,8 @@ HASHTAGS = [
     "girlsfashion", "cutegirls", "instagirl", "girllove", "trendylook",
     "selfielove", "queenstyle", "girlcrush", "femininevibes"
 ]
-COMMON_GIRL_NAMES = ["priya", "shreya", "anjali", "neha", "pooja", "queen", "baby", "angel", "cutie", "sweetie", "sweety", "barbie", "doll", "love", "girl"]
+BTS_KEYWORDS = ["bts", "army", "bangtan", "jungkook", "taehyung", "jimin", "suga", "rm", "jin", "jhope"]
+
 DM_MESSAGES = [
     "Hey! I saw your profile and just wanted to say hi! 😊",
     "Hi there! Your posts are amazing, keep shining! ✨",
@@ -52,8 +53,9 @@ def load_session():
 def login():
     if load_session():
         return
+
     print("🔑 Logging in fresh...")
-    bot.login(os.getenv("USERNAME"), os.getenv("PASSWORD"))
+    bot.login("Zehra.bloom_", "Ajmat1234@")  # Username & Password without 2-step verification
     
     session_data = bot.get_settings()
     encoded_session = base64.b64encode(json.dumps(session_data).encode()).decode()
@@ -82,28 +84,28 @@ def collect_usernames():
     print(f"✅ Collected {len(usernames)} usernames.")
     return usernames
 
-# ---- Function to filter girl usernames ----
-def filter_girl_usernames():
+# ---- Function to filter BTS-related usernames ----
+def filter_bts_usernames():
     try:
         with open(USERNAME_FILE, "r") as f:
             usernames = json.load(f)
     except (FileNotFoundError, json.JSONDecodeError):
         return []
 
-    filtered_users = []
+    bts_users = []
     for username in usernames:
         try:
             user_info = bot.user_info_by_username(username)
             full_name = user_info.full_name.lower() if user_info.full_name else ""
             bio = user_info.biography.lower() if user_info.biography else ""
 
-            if any(name in username for name in COMMON_GIRL_NAMES) or any(name in full_name for name in COMMON_GIRL_NAMES) or any(name in bio for name in COMMON_GIRL_NAMES):
-                filtered_users.append(username)
+            if any(keyword in username for keyword in BTS_KEYWORDS) or any(keyword in full_name for keyword in BTS_KEYWORDS) or any(keyword in bio for keyword in BTS_KEYWORDS):
+                bts_users.append(username)
         except Exception as e:
             print(f"⚠️ Could not fetch info for {username}: {e}")
 
-    print(f"🎯 {len(filtered_users)} potential girl accounts found.")
-    return filtered_users
+    print(f"🎯 {len(bts_users)} BTS-related accounts found.")
+    return bts_users
 
 # ---- Function to send DMs safely ----
 def send_dms(usernames):
@@ -141,10 +143,10 @@ if __name__ == "__main__":
     while True:
         print("\n🚀 Starting Instagram DM bot...\n")
         collect_usernames()
-        girl_usernames = filter_girl_usernames()
+        bts_usernames = filter_bts_usernames()
 
-        if girl_usernames:
-            send_dms(girl_usernames)
+        if bts_usernames:
+            send_dms(bts_usernames)
         else:
-            print("⚠️ No target usernames found. Retrying in 10 minutes.")
+            print("⚠️ No BTS-related usernames found. Retrying in 10 minutes.")
             time.sleep(600)
