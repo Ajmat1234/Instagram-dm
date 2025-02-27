@@ -4,13 +4,12 @@ import time
 import random
 import base64
 import os
+from datetime import datetime, timedelta
 from dotenv import load_dotenv
 
 # ---- Load Environment Variables ----
 load_dotenv()
-SESSION_DATA = os.getenv("SESSION_DATA")  # Railway ke ENV me set karna
-USERNAME = os.getenv("USERNAME")
-PASSWORD = os.getenv("PASSWORD")
+SESSION_DATA = os.getenv("SESSION_DATA")  # Railway ke ENV me yeh set karna
 
 # ---- Configuration ----
 BTS_HASHTAGS = ["btsarmy", "btsforever", "btson", "btslove", "btsfan"]
@@ -30,12 +29,18 @@ BREAK_TIME = 14400  # 4 ghante (in seconds)
 # ---- Instagram Client Setup ----
 bot = Client()
 
-# ---- Function to Load Session ----
 def load_session():
     if SESSION_DATA:
         try:
-            decoded_session = json.loads(base64.b64decode(SESSION_DATA).decode())  # Decode + Parse JSON
-            bot.load_settings(decoded_session)  # Dictionary format me load karna
+            # Base64 decode session and save to file
+            decoded_data = base64.b64decode(SESSION_DATA)
+            with open("ig_session.json", "wb") as f:
+                f.write(decoded_data)
+            
+            print("📝 Session file decoded and saved.")
+            
+            # Load session from file
+            bot.load_settings("ig_session.json")
             bot.get_timeline_feed()
             print("✅ Session login successful!")
             return True
@@ -43,21 +48,23 @@ def load_session():
             print(f"❌ Session load error: {str(e)}")
     return False
 
-# ---- Function to Login ----
 def login():
     if load_session():
-        return  # Agar session load ho gaya, to naya login ki zaroorat nahi
-
+        return
     print("🔑 Logging in fresh...")
-    bot.login(USERNAME, PASSWORD)
+    bot.login(os.getenv("USERNAME"), os.getenv("PASSWORD"))
     
+    # Save session for future logins
     session_data = bot.get_settings()
     encoded_session = base64.b64encode(json.dumps(session_data).encode()).decode()
+    
+    with open("ig_session.json", "w") as f:
+        json.dump(session_data, f)
     
     print("🔹 Copy and paste this SESSION_DATA into Railway environment variables:")
     print(encoded_session)
 
-# ---- Function to Collect Usernames ----
+# ---- Function to collect usernames ----
 def collect_usernames():
     usernames = set()
     for hashtag in BTS_HASHTAGS:
@@ -75,7 +82,7 @@ def collect_usernames():
     print(f"✅ Collected {len(usernames)} usernames.")
     return usernames
 
-# ---- Function to Filter Girl Usernames ----
+# ---- Function to filter girl usernames ----
 def filter_girl_usernames():
     try:
         with open(USERNAME_FILE, "r") as f:
@@ -87,7 +94,7 @@ def filter_girl_usernames():
     print(f"🎯 {len(filtered_users)} potential girl accounts found.")
     return filtered_users
 
-# ---- Function to Send DMs Safely ----
+# ---- Function to send DMs safely ----
 def send_dms(usernames):
     count = 0
     for username in usernames:
