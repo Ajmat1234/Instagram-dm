@@ -2,10 +2,16 @@ from instagrapi import Client
 import json
 import time
 import random
+import base64
+import os
 from datetime import datetime, timedelta
+from dotenv import load_dotenv
+
+# ---- Load Environment Variables ----
+load_dotenv()
+SESSION_DATA = os.getenv("SESSION_DATA")  # Railway ke ENV me yeh set karna
 
 # ---- Configuration ----
-SESSION_DATA = "your_session_data_here"  # Railway ke ENV me yeh set karna
 BTS_HASHTAGS = ["btsarmy", "btsforever", "btson", "btslove", "btsfan"]
 COMMON_GIRL_NAMES = ["priya", "shreya", "anjali", "neha", "pooja", "queen", "baby", "angel", "cutie", "sweetie"]
 DM_MESSAGES = [
@@ -22,28 +28,44 @@ BREAK_TIME = 14400  # 4 ghante (in seconds)
 
 # ---- Instagram Client Setup ----
 bot = Client()
-bot.load_settings(SESSION_DATA)
+
+def load_session():
+    if SESSION_DATA:
+        try:
+            decoded = base64.b64decode(SESSION_DATA)
+            bot.load_settings(decoded.decode())
+            bot.get_timeline_feed()
+            print("✅ Session login successful!")
+            return True
+        except Exception as e:
+            print(f"❌ Session load error: {str(e)}")
+    return False
+
+def login():
+    if load_session():
+        return
+    print("🔑 Logging in fresh...")
+    bot.login(os.getenv("USERNAME"), os.getenv("PASSWORD"))
+    session_data = bot.get_settings()
+    encoded_session = base64.b64encode(json.dumps(session_data).encode()).decode()
+    print("🔹 Save this SESSION_DATA for future logins:")
+    print(encoded_session)
 
 # ---- Function to collect usernames ----
 def collect_usernames():
     usernames = set()
-
     for hashtag in BTS_HASHTAGS:
         try:
             print(f"🔍 Searching for posts under #{hashtag}...")
             posts = bot.hashtag_medias_top(hashtag, amount=10)
-            
             for post in posts:
                 username = post.user.username.lower()
-                if username not in usernames:
-                    usernames.add(username)
+                usernames.add(username)
         except Exception as e:
             print(f"⚠️ Error fetching from #{hashtag}: {e}")
 
-    # Save collected usernames
     with open(USERNAME_FILE, "w") as f:
         json.dump(list(usernames), f)
-
     print(f"✅ Collected {len(usernames)} usernames.")
     return usernames
 
@@ -56,14 +78,12 @@ def filter_girl_usernames():
         return []
 
     filtered_users = [u for u in usernames if any(name in u for name in COMMON_GIRL_NAMES)]
-
     print(f"🎯 {len(filtered_users)} potential girl accounts found.")
     return filtered_users
 
 # ---- Function to send DMs safely ----
 def send_dms(usernames):
     count = 0
-
     for username in usernames:
         if count >= MAX_DAILY_DMS:
             print("🚀 20 DMs sent. Taking a 4-hour break...")
@@ -73,7 +93,6 @@ def send_dms(usernames):
         try:
             user_id = bot.user_id_from_username(username)
             message = random.choice(DM_MESSAGES)
-
             bot.direct_send(message, [user_id])
             print(f"✅ DM sent to {username}")
 
@@ -86,6 +105,7 @@ def send_dms(usernames):
 
 # ---- Main Execution ----
 if __name__ == "__main__":
+    login()
     while True:
         print("\n🚀 Starting Instagram BTS DM bot...\n")
         collect_usernames()
