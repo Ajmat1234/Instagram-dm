@@ -32,8 +32,8 @@ bot = Client()
 def load_session():
     if SESSION_DATA:
         try:
-            decoded = base64.b64decode(SESSION_DATA)
-            bot.load_settings(decoded.decode())
+            decoded_session = json.loads(base64.b64decode(SESSION_DATA).decode())  # Base64 decode + JSON parse
+            bot.load_settings(decoded_session)  # JSON format me load karna
             bot.get_timeline_feed()
             print("✅ Session login successful!")
             return True
@@ -48,7 +48,7 @@ def login():
     bot.login(os.getenv("USERNAME"), os.getenv("PASSWORD"))
     session_data = bot.get_settings()
     encoded_session = base64.b64encode(json.dumps(session_data).encode()).decode()
-    print("🔹 Save this SESSION_DATA for future logins:")
+    print("🔹 Copy and paste this SESSION_DATA into Railway environment variables:")
     print(encoded_session)
 
 # ---- Function to collect usernames ----
