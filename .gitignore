@@ -1,6 +1,6 @@
-ig_session.json
-.env
 __pycache__/
 *.pyc
 *.pyo
-.DS_Store
+*.log
+.env
+ig_session.json
