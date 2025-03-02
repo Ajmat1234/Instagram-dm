@@ -5,7 +5,7 @@ import os
 
 # ---- Instagram Credentials ----
 USERNAME = "Zehra.bloom_"  # Instagram ID
-PASSWORD = "Ajmat1234@"  # Instagram Password
+PASSWORD = "Ajmat1234@@"  # Instagram Password
 
 # ---- Instagram Client Setup ----
 bot = Client()
