@@ -74,20 +74,27 @@ def save_session():
 
 # ---- Handle Login ----
 def login():
-    for _ in range(3):
+    for _ in range(3):  # 3 बार कोशिश करेगा
         try:
             setup_stealth()
             if load_session() and bot.user_id:
                 return True
-                
-            login_response = bot.login(USERNAME, PASSWORD)
-            if login_response and login_response.get("challenge_required"):
-                if handle_challenge():
-                    save_session()
-                    return True
-                    
-            save_session()
-            return True
+            
+            # 🔹 Corrected login response handling
+            success = bot.login(USERNAME, PASSWORD)  # Returns True/False
+
+            if success:  # अगर लॉगिन सफल हो गया
+                save_session()
+                return True
+            
+        except (LoginRequired, ChallengeRequired) as e:
+            print(f"Login Issue: {str(e)[:50]}")
+            time.sleep(random.randint(10, 30))
+        except Exception as e:
+            print(f"Login Failed: {str(e)[:50]}")
+            time.sleep(random.randint(20, 40))
+    
+    return False
             
         except (LoginRequired, ChallengeRequired) as e:
             print(f"Login Issue: {str(e)[:50]}")
