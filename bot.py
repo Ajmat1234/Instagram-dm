@@ -115,13 +115,19 @@ def process_group_chat(thread):
 def monitor_groups():
     while True:
         try:
-            threads = bot.direct_threads(selected_filter="group")
-            for thread in threads:
+            print("\n🔍 Checking group chats...")
+            # सभी threads लो और group वाले filter करो
+            all_threads = bot.direct_threads()
+            group_threads = [t for t in all_threads if t.type == 'group']
+            
+            for thread in group_threads:
                 try:
                     process_group_chat(thread)
                 except Exception as e:
-                    print(f"❌ Error in {thread.title}: {e}")
+                    print(f"❌ Error processing {thread.title}: {e}")
+            
             time.sleep(GC_CHECK_INTERVAL)
+            
         except Exception as e:
             print(f"❌ Critical error: {e}")
             time.sleep(60)
