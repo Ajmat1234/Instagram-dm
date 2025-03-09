@@ -6,6 +6,7 @@ import os
 import base64
 import json
 from datetime import datetime, timedelta
+import pytz
 
 # ---- Instagram Credentials ----
 USERNAME = "kalllu_kaliiyaaa"
@@ -15,6 +16,9 @@ SESSION_ENV_VAR = "INSTA_SESSION_DATA"
 # ---- Initialize Client ----
 bot = Client()
 bot.delay_range = [2, 5]
+
+# ---- Set Indian Timezone ----
+IST = pytz.timezone("Asia/Kolkata")
 
 # ---- Session Management ----
 def load_session_from_env():
@@ -90,38 +94,44 @@ warned_users = set()
 joined_users = set()
 
 def process_thread(thread):
-    now = datetime.now()
-    thread_id = thread.id
-    
-    # Check last message time
-    messages = bot.direct_messages(thread_id=thread_id, amount=10)
-    last_msg_time = messages[0].timestamp if messages else now - timedelta(minutes=21)
-    
-    # Revival logic
-    if (now - last_msg_time).total_seconds() > GC_DEAD_TIME:
-        if thread_id not in last_revive_time or (now - last_revive_time[thread_id]).total_seconds() > REVIVE_COOLDOWN:
-            msg = random.choice(FUNNY_REVIVE)
-            bot.direct_send(msg, thread_ids=[thread_id])
-            last_revive_time[thread_id] = now
-            print(f"💀 Revived chat in {thread_id}")
-    
-    # Message processing
-    for msg in messages:
-        # Bad words check
-        if msg.text and any(word in msg.text.lower() for word in BAD_WORDS):
-            if msg.user_id != bot.user_id and msg.user.pk not in warned_users:
-                user = f"@{msg.user.username}"
-                bot.direct_send(random.choice(WARNINGS).format(user=user), thread_ids=[thread_id])
-                warned_users.add(msg.user.pk)
-                print(f"⚠️ Warned {user}")
+    now = datetime.now(IST)  # Indian time zone
+
+    try:
+        messages = bot.direct_messages(thread_id=thread.id, amount=10)
         
-        # New member check
-        if msg.item_type == 'action' and 'added' in msg.text:
-            new_user = next((u for u in msg.users if u.pk not in joined_users), None)
-            if new_user:
-                bot.direct_send(random.choice(WELCOME_MSG).format(user=f"@{new_user.username}"), thread_ids=[thread_id])
-                joined_users.add(new_user.pk)
-                print(f"🎉 Welcomed @{new_user.username}")
+        if messages:
+            last_msg_time = messages[0].timestamp.astimezone(IST)  # Convert timestamp to IST
+        else:
+            last_msg_time = now - timedelta(minutes=21)
+
+        # Revival logic
+        if (now - last_msg_time).total_seconds() > GC_DEAD_TIME:
+            if thread.id not in last_revive_time or (now - last_revive_time[thread.id]).total_seconds() > REVIVE_COOLDOWN:
+                msg = random.choice(FUNNY_REVIVE)
+                bot.direct_send(msg, thread_ids=[thread.id])
+                last_revive_time[thread.id] = now
+                print(f"💀 Revived chat in {thread.id}")
+
+        # Message processing
+        for msg in messages:
+            # Bad words check
+            if msg.text and any(word in msg.text.lower() for word in BAD_WORDS):
+                if msg.user_id != bot.user_id and msg.user.pk not in warned_users:
+                    user = f"@{msg.user.username}"
+                    bot.direct_send(random.choice(WARNINGS).format(user=user), thread_ids=[thread.id])
+                    warned_users.add(msg.user.pk)
+                    print(f"⚠️ Warned {user}")
+            
+            # New member check
+            if msg.item_type == 'action' and 'added' in msg.text:
+                new_user = next((u for u in msg.users if u.pk not in joined_users), None)
+                if new_user:
+                    bot.direct_send(random.choice(WELCOME_MSG).format(user=f"@{new_user.username}"), thread_ids=[thread.id])
+                    joined_users.add(new_user.pk)
+                    print(f"🎉 Welcomed @{new_user.username}")
+
+    except Exception as e:
+        print(f"❌ Error processing thread {thread.id}: {e}")
 
 def monitor_all_threads():
     while True:
