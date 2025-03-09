@@ -1,6 +1,5 @@
 from instagrapi import Client
 from instagrapi.exceptions import LoginRequired, ChallengeRequired
-from instagrapi.types import DirectMessage
 import time
 import random
 import os
@@ -69,11 +68,12 @@ if not login():
 GC_CHECK_INTERVAL = 300  # 5 minutes
 GC_DEAD_TIME = 1200      # 20 minutes
 REVIVE_COOLDOWN = 1200   # 20 minutes cooldown
+TRACKING_FILE = "user_track.json"
 
 # ---- Messages ----
 FUNNY_REVIVE = [
     "Group तो मर गया... कोई ज़िंदा है? 💀",
-    "चुप्पी का सुनामी आ गया क्या? 🌊",
+    "चुप्पी का सुनामी आ गया क्या? 🌊", 
     "अरे यार! बात करो ना... 👻"
 ]
 
@@ -82,9 +82,10 @@ WARNINGS = [
     "ऐसे शब्द नहीं चलेंगे {user}! 🚫"
 ]
 
-WELCOME_MSG = [
+WELCOME_MSGS = [
     "नमस्ते {user}! स्वागत है! 🎉",
-    "{user} आया ओए! पार्टी शुरू! 🥳"
+    "{user} आया ओए! पार्टी शुरू! 🥳",
+    "😍 {user}, TUSSI AA GYE HO TO MUJHE CHHOD KR N JAANA! 🥺"
 ]
 
 BAD_WORDS = ['mc', 'bc', 'chutiya', 'gandu', 'bhosdi', 'madarchod']
@@ -92,80 +93,87 @@ BAD_WORDS = ['mc', 'bc', 'chutiya', 'gandu', 'bhosdi', 'madarchod']
 # ---- Tracking ----
 last_revive_time = {}
 warned_users = set()
-joined_users = set()
 
-def process_group_chat(thread):
-    now = datetime.now(IST)
-
+def load_users():
     try:
-        # Get last 20 messages for better tracking
-        messages = bot.direct_messages(thread_id=thread.id, amount=20)
-        
-        # Find last non-action message
-        last_msg_time = now
-        for msg in messages:
-            if msg.type != 'action':
-                last_msg_time = msg.timestamp.astimezone(IST)
-                break
+        with open(TRACKING_FILE, "r") as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
 
-        # Revival logic for inactive groups
+def save_user(user_id):
+    users = load_users()
+    users[user_id] = datetime.now(IST).isoformat()
+    with open(TRACKING_FILE, "w") as f:
+        json.dump(users, f)
+
+def should_welcome(user_id):
+    users = load_users()
+    if user_id not in users:
+        return True
+    last_mentioned = datetime.fromisoformat(users[user_id]).astimezone(IST)
+    return datetime.now(IST) - last_mentioned > timedelta(hours=12)
+
+# ---- Main Logic ----
+def process_group(thread):
+    now = datetime.now(IST)
+    
+    try:
+        # Check last messages
+        messages = bot.direct_messages(thread_id=thread.id, amount=10)
+        
+        # Revival logic
+        last_msg_time = now
+        if messages:
+            last_msg = next((msg for msg in messages if msg.type != 'action'), None)
+            if last_msg:
+                last_msg_time = last_msg.timestamp.astimezone(IST)
+                
         if (now - last_msg_time).total_seconds() > GC_DEAD_TIME:
             if thread.id not in last_revive_time or (now - last_revive_time[thread.id]).total_seconds() > REVIVE_COOLDOWN:
-                msg = random.choice(FUNNY_REVIVE)
-                bot.direct_send(msg, thread_ids=[thread.id])
+                bot.direct_send(random.choice(FUNNY_REVIVE), thread_ids=[thread.id])
                 last_revive_time[thread.id] = now
-                print(f"💀 Revived group {thread.id}")
+                print(f"💀 Revived {thread.id}")
 
         # Process messages
         for msg in messages:
-            # Skip action messages for content checks
-            if msg.type == 'action':
-                continue
-
-            # Bad words check
-            if msg.text and any(word in msg.text.lower() for word in BAD_WORDS):
-                if msg.user_id != bot.user_id and msg.user.pk not in warned_users:
-                    user = f"@{msg.user.username}"
-                    bot.direct_send(random.choice(WARNINGS).format(user=user), thread_ids=[thread.id])
-                    warned_users.add(msg.user.pk)
-                    print(f"⚠️ Warned {user} in group {thread.id}")
-
-    except Exception as e:
-        print(f"❌ Error processing group {thread.id}: {e}")
-
-def process_join_events(thread):
-    try:
-        messages = bot.direct_messages(thread_id=thread.id, amount=20)
-        for msg in messages:
-            # Check for user added events
+            # New member check
             if msg.type == 'action' and 'added' in msg.text.lower():
-                # Extract added users
-                new_users = [u for u in msg.users if u.pk not in joined_users]
-                for user in new_users:
-                    bot.direct_send(
-                        random.choice(WELCOME_MSG).format(user=f"@{user.username}"),
-                        thread_ids=[thread.id]
-                    )
-                    joined_users.add(user.pk)
-                    print(f"🎉 Welcomed @{user.username} in {thread.id}")
+                for user in msg.users:
+                    if should_welcome(str(user.pk)):
+                        bot.direct_send(
+                            random.choice(WELCOME_MSGS).format(user=f"@{user.username}"),
+                            thread_ids=[thread.id]
+                        )
+                        save_user(str(user.pk))
+                        print(f"🎉 Welcomed @{user.username}")
+
+            # Bad word check
+            elif msg.type == 'text':
+                text = msg.text.lower()
+                if any(word in text for word in BAD_WORDS):
+                    if msg.user_id != bot.user_id and msg.user.pk not in warned_users:
+                        user = f"@{msg.user.username}"
+                        bot.direct_send(random.choice(WARNINGS).format(user=user), thread_ids=[thread.id])
+                        warned_users.add(msg.user.pk)
+                        print(f"⚠️ Warned {user}")
 
     except Exception as e:
-        print(f"❌ Join event error in {thread.id}: {e}")
+        print(f"❌ Error in {thread.id}: {str(e)[:100]}")
 
 def monitor_groups():
     while True:
         try:
-            print("\n🔍 Checking group chats...")
-            threads = bot.direct_threads(thread_type="private")  # Get group chats
+            print("\n🔍 Checking groups...")
+            threads = bot.direct_threads(amount=20)  # Fixed line
             for thread in threads:
-                if thread.is_group:  # Process only group chats
-                    process_join_events(thread)
-                    process_group_chat(thread)
+                if thread.is_group:
+                    process_group(thread)
             time.sleep(GC_CHECK_INTERVAL)
         except Exception as e:
             print(f"❌ Main error: {str(e)[:100]}")
             time.sleep(60)
 
 if __name__ == "__main__":
-    print("\n🚀 Group Chat Bot Started!")
+    print("\n🚀 Group Manager Started!")
     monitor_groups()
