@@ -83,6 +83,7 @@ def setup_stealth():
     try:
         bot.set_device({
             "app_version": "121.0.0.29.119",
+            "version_code": "195820218",  # Fixed missing key
             "android_version": random.randint(25, 30),
             "android_release": f"{random.randint(8,12)}.0.0",
             "dpi": random.choice(["480dpi", "420dpi", "400dpi"]),
@@ -111,78 +112,27 @@ def setup_stealth():
     except Exception as e:
         print(f"Stealth Error: {str(e)[:50]}")
 
-# ---- Session Management ----
-def load_session_from_env():
-    try:
-        session_data = os.getenv(SESSION_ENV_VAR)
-        if session_data:
-            decoded = base64.b64decode(session_data).decode()
-            bot.set_settings(json.loads(decoded))
-            print("✅ Session loaded")
-            return True
-    except Exception as e:
-        print(f"Session Error: {str(e)[:50]}")
-    return False
-
-def save_session_to_env():
-    try:
-        session_json = json.dumps(bot.get_settings())
-        encoded = base64.b64encode(session_json.encode()).decode()
-        print(f"🔑 New Session: {encoded[:30]}...")
-    except Exception as e:
-        print(f"Save Failed: {str(e)[:50]}")
-
-# ---- Enhanced Login ----
-def handle_challenge():
-    try:
-        bot.challenge_resolve(bot.last_challenge_path)
-        return bot.challenge_complete()
-    except Exception as e:
-        print(f"Challenge Error: {str(e)[:50]}")
-        return False
-
+# ---- Login System ----
 def login():
-    for _ in range(3):
-        try:
-            setup_stealth()
-            if load_session_from_env() and bot.user_id:
-                return True
-                
-            login_response = bot.login(USERNAME, PASSWORD)
-            if login_response and login_response.get("challenge_required"):
-                if handle_challenge():
-                    save_session_to_env()
-                    return True
-                    
-            save_session_to_env()
-            return True
-            
-        except (LoginRequired, ChallengeRequired) as e:
-            print(f"Login Issue: {str(e)[:50]}")
-            time.sleep(random.randint(10, 30))
-        except Exception as e:
-            print(f"Login Failed: {str(e)[:50]}")
-            time.sleep(random.randint(20, 40))
-    return False
-
-# ---- Human Behavior ----
-def human_delay():
-    time.sleep(random.uniform(1.2, 4.8))
-
-def random_activity():
-    if random.random() < 0.25:
-        try:
-            bot.feed_timeline()
-            human_delay()
-        except:
-            pass
+    try:
+        setup_stealth()
+        bot.login(USERNAME, PASSWORD)
+        print("✅ Logged in successfully!")
+        return True
+    except ChallengeRequired:
+        print("⚠️ Challenge required. Trying to resolve...")
+        return False
+    except LoginRequired:
+        print("⚠️ Login required. Restarting session...")
+        return False
+    except Exception as e:
+        print(f"❌ Login failed: {str(e)}")
+        return False
 
 # ---- Group Logic ----
 def process_group(thread):
     try:
-        random_activity()
         now = datetime.now(IST)
-        
         messages = bot.direct_messages(thread_id=thread.id, amount=random.randint(8,12))
         
         # Revival Logic
@@ -194,7 +144,6 @@ def process_group(thread):
                     bot.direct_send(random.choice(FUNNY_REVIVE), thread_ids=[thread.id])
                     last_revive_time[thread.id] = now
                     print(f"💀 Revived {thread.id}")
-                    human_delay()
 
         # Message Processing
         for msg in messages:
@@ -208,7 +157,6 @@ def process_group(thread):
                         )
                         save_user(str(user.pk))
                         print(f"🎉 Welcomed @{user.username}")
-                        human_delay()
 
             # Bad Word Check
             elif msg.item_type == 'text':
@@ -221,39 +169,29 @@ def process_group(thread):
                             bot.direct_send(random.choice(WARNINGS).format(user=user), thread_ids=[thread.id])
                             warned_users.add(msg.user_id)
                             print(f"⚠️ Warned {user}")
-                            human_delay()
                         except Exception as e:
                             print(f"User Info Error: {str(e)[:50]}")
 
     except Exception as e:
         print(f"Group Error: {str(e)[:50]}")
-        time.sleep(random.randint(30, 60))
 
 def monitor_groups():
-    error_count = 0
+    if not login():
+        print("❌ Bot failed to login. Exiting.")
+        return
+
     while True:
         try:
-            check_interval = random.randint(250, 350) * random.uniform(0.8, 1.2)
-            print(f"⏳ Next Check: {check_interval//60} mins")
-            
-            threads = bot.direct_threads(amount=random.randint(15, 25))
-            for thread in random.sample(threads, k=min(3, len(threads))):
+            threads = bot.direct_threads(amount=10)
+            for thread in threads:
                 if thread.is_group:
                     process_group(thread)
                     time.sleep(random.uniform(5, 15))
-                    
-            error_count = max(0, error_count-1)
-            time.sleep(check_interval)
-            
+            time.sleep(random.randint(250, 350))
         except Exception as e:
-            error_count += 1
-            wait_time = 60 * min(error_count, 10)
-            print(f"⚠️ Cooling Down: {wait_time//60} mins")
-            time.sleep(wait_time + random.randint(-30, 30))
+            print(f"⚠️ Error in monitoring: {str(e)[:50]}")
+            time.sleep(60)
 
 if __name__ == "__main__":
     print("🚀 Starting Smart Group Manager")
-    if login():
-        monitor_groups()
-    else:
-        print("❌ Critical Login Failure")
+    monitor_groups()
