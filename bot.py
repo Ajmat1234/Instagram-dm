@@ -73,7 +73,7 @@ TRACKING_FILE = "user_track.json"
 # ---- Messages ----
 FUNNY_REVIVE = [
     "Group तो मर गया... कोई ज़िंदा है? 💀",
-    "चुप्पी का सुनामी आ गया क्या? 🌊", 
+    "चुप्पी का सुनामी आ गया क्या? 🌊",
     "अरे यार! बात करो ना... 👻"
 ]
 
@@ -119,16 +119,16 @@ def process_group(thread):
     now = datetime.now(IST)
     
     try:
-        # Check last messages
         messages = bot.direct_messages(thread_id=thread.id, amount=10)
         
         # Revival logic
         last_msg_time = now
         if messages:
-            last_msg = next((msg for msg in messages if msg.type != 'action'), None)
-            if last_msg:
-                last_msg_time = last_msg.timestamp.astimezone(IST)
-                
+            for msg in messages:
+                if msg.item_type != 'action':  # Changed here
+                    last_msg_time = msg.timestamp.astimezone(IST)
+                    break
+
         if (now - last_msg_time).total_seconds() > GC_DEAD_TIME:
             if thread.id not in last_revive_time or (now - last_revive_time[thread.id]).total_seconds() > REVIVE_COOLDOWN:
                 bot.direct_send(random.choice(FUNNY_REVIVE), thread_ids=[thread.id])
@@ -138,7 +138,7 @@ def process_group(thread):
         # Process messages
         for msg in messages:
             # New member check
-            if msg.type == 'action' and 'added' in msg.text.lower():
+            if msg.item_type == 'action' and 'added' in msg.text.lower():  # Changed here
                 for user in msg.users:
                     if should_welcome(str(user.pk)):
                         bot.direct_send(
@@ -149,7 +149,7 @@ def process_group(thread):
                         print(f"🎉 Welcomed @{user.username}")
 
             # Bad word check
-            elif msg.type == 'text':
+            elif msg.item_type == 'text':  # Changed here
                 text = msg.text.lower()
                 if any(word in text for word in BAD_WORDS):
                     if msg.user_id != bot.user_id and msg.user.pk not in warned_users:
@@ -165,7 +165,7 @@ def monitor_groups():
     while True:
         try:
             print("\n🔍 Checking groups...")
-            threads = bot.direct_threads(amount=20)  # Fixed line
+            threads = bot.direct_threads(amount=20)
             for thread in threads:
                 if thread.is_group:
                     process_group(thread)
