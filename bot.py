@@ -1,5 +1,4 @@
 from instagrapi import Client
-from instagrapi.exceptions import LoginRequired, ChallengeRequired
 import time
 import random
 import os
@@ -14,7 +13,7 @@ USERNAME = "kalllu_kaliiyaaa"
 PASSWORD = "Ajmat1234@@@"
 SESSION_ENV_VAR = "INSTA_SESSION_DATA"
 
-# ---- Updated Proxy List ----
+# ---- Proxy List (Optional) ----
 PROXIES = [
     "http://152.67.213.161:80",
     "http://194.195.119.194:3128",
@@ -28,29 +27,28 @@ bot = Client()
 bot.delay_range = [random.uniform(2.5, 6.7), random.uniform(7.1, 12.3)]
 IST = pytz.timezone("Asia/Kolkata")
 
-# ---- Enhanced Messages ----
+# ---- Messages ----
+BOT_ENTRY_MSG = "@king_of_status_4u_ sir mai aa gya aapke gc members ki sewa me"
 FUNNY_REVIVE = [
     "Group तो मर गया... कोई ज़िंदा है? 💀",
     "चुप्पी का सुनामी आ गया क्या? 🌊",
     "अरे यार! बात करो ना... 👻"
 ]
-
 WARNINGS = [
     "{user} भाई! भाषा संभालो! ⚠️",
     "ऐसे शब्द नहीं चलेंगे {user}! 🚫"
 ]
-
 WELCOME_MSGS = [
     "नमस्ते {user}! स्वागत है! 🎉",
     "{user} आया ओए! पार्टी शुरू! 🥳"
 ]
-
 BAD_WORDS = ['mc', 'bc', 'chutiya', 'gandu', 'bhosdi', 'madarchod', 'lavde', 'lund']
 
 # ---- Tracking System ----
 TRACKING_FILE = "user_track.json"
 last_revive_time = {}
 warned_users = set()
+entry_message_sent = False  # यह चेक करेगा कि login के बाद msg भेजा गया है या नहीं
 
 def load_users():
     try:
@@ -64,13 +62,6 @@ def save_user(user_id):
     users[user_id] = datetime.now(IST).isoformat()
     with open(TRACKING_FILE, "w") as f:
         json.dump(users, f)
-
-def should_welcome(user_id):
-    users = load_users()
-    if user_id not in users:
-        return True
-    last_mentioned = datetime.fromisoformat(users[user_id]).astimezone(IST)
-    return (datetime.now(IST) - last_mentioned) > timedelta(hours=12)
 
 # ---- Advanced Anti-Detection ----
 def setup_stealth():
@@ -122,6 +113,7 @@ def load_session():
 
 # ---- Smart Login System ----
 def login():
+    global entry_message_sent  # ताकि एक ही बार msg भेजा जाए
     for attempt in range(3):
         try:
             setup_stealth()
@@ -131,6 +123,12 @@ def login():
             print("🔐 Logging in...")
             bot.login(USERNAME, PASSWORD)
             print("✅ Login successful")
+
+            # Login होते ही ग्रुप में मैसेज भेजेगा
+            if not entry_message_sent:
+                send_entry_message()
+                entry_message_sent = True
+
             return True
 
         except Exception as e:
@@ -141,6 +139,18 @@ def login():
 # ---- Human-like Behavior ----
 def human_delay():
     time.sleep(random.uniform(1.5, 4.5))
+
+# ---- Send Entry Message in Group ----
+def send_entry_message():
+    try:
+        threads = bot.direct_threads(amount=10)
+        for thread in threads:
+            if thread.is_group:
+                bot.direct_send(BOT_ENTRY_MSG, thread_ids=[thread.id])
+                print(f"🚀 Entry Message Sent in {thread.title}")
+                break  # सिर्फ एक ग्रुप में भेजेगा
+    except Exception as e:
+        print(f"❌ Entry Message Error: {str(e)[:100]}")
 
 # ---- Group Management ----
 def process_group(thread):
@@ -158,46 +168,34 @@ def process_group(thread):
                     revive_msg = random.choice(FUNNY_REVIVE)
                     bot.direct_send(revive_msg, thread_ids=[thread.id])
                     last_revive_time[thread.id] = now
-                    print(f"💀 Revived group {thread.title} with message: {revive_msg}")
+                    print(f"💀 Revived group {thread.title}")
                     human_delay()
 
         # Message Processing
         for msg in messages:
             if msg.item_type == 'text':
-                print(f"📨 New message from {msg.user_id}: {msg.text}")
                 text = msg.text.lower()
                 if any(bad_word in text for bad_word in BAD_WORDS):
-                    if msg.user_id != bot.user_id and msg.user_id not in warned_users:
-                        try:
-                            user_info = bot.user_info(msg.user_id)
-                            warning = random.choice(WARNINGS).format(user=f"@{user_info.username}")
-                            bot.direct_send(warning, thread_ids=[thread.id])
-                            warned_users.add(msg.user_id)
-                            print(f"⚠️ Warned @{user_info.username} for bad language")
-                            human_delay()
-                        except Exception as e:
-                            print(f"🚫 Warning Error: {str(e)[:50]}")
+                    user_info = bot.user_info(msg.user_id)
+                    warning = random.choice(WARNINGS).format(user=f"@{user_info.username}")
+                    bot.direct_send(warning, thread_ids=[thread.id])
+                    print(f"⚠️ Warned @{user_info.username}")
+                    human_delay()
     except Exception as e:
         print(f"❌ Group Error: {str(e)[:100]}")
 
 # ---- Monitoring System ----
 def monitor_groups():
     while True:
-        try:
-            print(f"⏳ Checking groups...")
-            threads = bot.direct_threads(amount=20)
-            for thread in threads:
-                if thread.is_group:
-                    process_group(thread)
-                    time.sleep(random.uniform(10, 20))
-            time.sleep(random.randint(300, 420))  # 5-7 minutes
-        except Exception as e:
-            print(f"🚨 Monitoring Error: {str(e)[:100]}")
-            time.sleep(60)
+        threads = bot.direct_threads(amount=20)
+        for thread in threads:
+            if thread.is_group:
+                process_group(thread)
+        time.sleep(random.randint(300, 420))
 
 # ---- Start Bot ----
 if __name__ == "__main__":
-    print("\n🚀 Group Manager 2.0 Started!")
+    print("\n🚀 Group Manager Bot Started!")
     if login():
         monitor_groups()
     else:
