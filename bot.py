@@ -21,20 +21,22 @@ IST = pytz.timezone("Asia/Kolkata")
 
 # ---- Device Spoofing ----
 def setup_stealth():
+def setup_stealth():
     try:
         bot.set_device({
-            "app_version": "121.0.0.29.119",
-            "android_version": random.randint(25, 30),
-            "android_release": f"{random.randint(8,12)}.0.0",
+            "app_version": "321.0.0.18.114",
+            "version_code": "321180114",
+            "android_version": random.randint(26, 33),
+            "android_release": f"{random.randint(9, 14)}.0.0",
             "dpi": random.choice(["480dpi", "420dpi", "400dpi"]),
-            "resolution": random.choice(["1080x1920", "1080x2280", "720x1280"]),
-            "manufacturer": random.choice(["Samsung", "OnePlus", "Realme"]),
-            "device": random.choice(["Galaxy S22", "Nord 2", "Realme 7 Pro"]),
+            "resolution": random.choice(["1080x2400", "1440x3120", "1080x1920"]),
+            "manufacturer": random.choice(["Samsung", "Google", "OnePlus", "Xiaomi"]),
+            "device": random.choice(["Galaxy S23", "Pixel 7", "OnePlus 11", "Redmi K50"]),
             "model": "Custom Phone",
             "cpu": "qcom",
-            "user_agent": ""
+            "user_agent": f"Instagram 321.0.0.18.114 Android ({random.randint(26, 33)}; {random.choice(['Pixel 7', 'Galaxy S23', 'OnePlus 11'])})"
         })
-        
+
         bot.set_uuids({
             "phone_id": str(uuid.uuid4()),
             "uuid": str(uuid.uuid4()),
@@ -42,8 +44,9 @@ def setup_stealth():
             "advertising_id": str(uuid.uuid4()),
         })
         
-        bot.set_locale("en_IN")
-        bot.set_timezone_offset(19800)
+        bot.set_locale("en_US")
+        bot.set_timezone_offset(19800)  # Indian Timezone
+        
         bot.nonce = str(random.randint(1000000, 9999999))
 
     except Exception as e:
