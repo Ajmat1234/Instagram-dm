@@ -16,45 +16,39 @@ SESSION_ENV_VAR = "INSTA_SESSION_DATA"
 
 # ---- Updated Proxy List ----
 PROXIES = [
-    "http://152.67.213.161:80",    # Reliable Indian proxy
-    "http://194.195.119.194:3128",  # Premium
-    "http://45.117.179.53:8080",   # Mumbai based
-    "http://103.148.210.77:80",    # Delhi server
-    "http://49.36.127.84:8080"    # Fast Indian proxy
+    "http://152.67.213.161:80",
+    "http://194.195.119.194:3128",
+    "http://45.117.179.53:8080",
+    "http://103.148.210.77:80",
+    "http://49.36.127.84:8080"
 ]
 
 # ---- Initialize Client ----
 bot = Client()
-bot.delay_range = [random.uniform(2.5, 6.7), random.uniform(7.1, 12.3)]  # Dynamic delay
+bot.delay_range = [random.uniform(2.5, 6.7), random.uniform(7.1, 12.3)]
 IST = pytz.timezone("Asia/Kolkata")
 
 # ---- Enhanced Messages ----
 FUNNY_REVIVE = [
     "Group तो मर गया... कोई ज़िंदा है? 💀",
     "चुप्पी का सुनामी आ गया क्या? 🌊",
-    "अरे यार! बात करो ना... 👻",
-    "क्या सब सो गए? 😴 जगाओ किसी को!"
+    "अरे यार! बात करो ना... 👻"
 ]
 
 WARNINGS = [
     "{user} भाई! भाषा संभालो! ⚠️",
-    "ऐसे शब्द नहीं चलेंगे {user}! 🚫",
-    "ये ग्रुप सैफ जोन है {user} 😡",
-    "वार्निंग 1/3 ⚠️ {user}"
+    "ऐसे शब्द नहीं चलेंगे {user}! 🚫"
 ]
 
 WELCOME_MSGS = [
     "नमस्ते {user}! स्वागत है! 🎉",
     "{user} आया ओए! पार्टी शुरू! 🥳",
-    "😍 {user}, TUSSI AA GYE HO TO MUJHE CHHOD KR N JAANA! 🥺",
-    "👋 ओये {user}! कैसे हो?"
+    "😍 {user}, TUSSI AA GYE HO TO MUJHE CHHOD KR N JAANA! 🥺"
 ]
 
 BAD_WORDS = [
-    'mc', 'bc', 'chutiya', 'gandu', 
-    'bhosdi', 'madarchod', 'lavde', 'lund',
-    'jhaat', 'gaand', 'kutta', 'kuttiya',
-    'randi', 'kamina', 'harami'
+    'mc', 'bc', 'chutiya', 'gandu',
+    'bhosdi', 'madarchod', 'lavde', 'lund'
 ]
 
 # ---- Tracking System ----
@@ -75,17 +69,19 @@ def save_user(user_id):
     with open(TRACKING_FILE, "w") as f:
         json.dump(users, f)
 
-def should_welcome(user_id):
+def should_welcome(user_id):  # Fixed syntax here
     users = load_users()
-    return users.get(user_id) is None or \
-        (datetime.now(IST) - datetime.fromisoformat(users[user_id]).total_seconds() > 43200  # 12 hours
+    if user_id not in users:
+        return True
+    last_mentioned = datetime.fromisoformat(users[user_id]).astimezone(IST)
+    return (datetime.now(IST) - last_mentioned) > timedelta(hours=12)
 
 # ---- Advanced Anti-Detection ----
 def setup_stealth():
     try:
         device_config = {
             "app_version": "121.0.0.29.119",
-            "version_code": "199381241",  # Critical fix added
+            "version_code": "199381241",
             "android_version": random.randint(27, 33),
             "android_release": f"{random.choice([8,9,10,11,12])}.0.0",
             "dpi": f"{random.choice([480,420,400])}dpi",
@@ -93,22 +89,15 @@ def setup_stealth():
             "manufacturer": random.choice(["Xiaomi", "Samsung", "Realme"]),
             "device": random.choice(["Redmi Note 10", "Galaxy A52", "Narzo 50"]),
             "model": "Custom Device",
-            "cpu": "qcom",
-            "user_agent": ""
+            "cpu": "qcom"
         }
         bot.set_device(device_config)
         
-        # Smart Proxy Rotation
-        global PROXIES
         if PROXIES:
             proxy = random.choice(PROXIES)
             bot.set_proxy(proxy)
-            print(f"🌀 Testing proxy: {proxy}")
-            # Test proxy connection
-            bot.get_timeline_feed()  # Simple API call to test
-        else:
-            print("⚠️ No proxies left! Using direct connection")
-        
+            print(f"🌀 Using proxy: {proxy}")
+
         bot.set_uuids({
             "phone_id": str(uuid.uuid4()),
             "uuid": str(uuid.uuid4()),
@@ -117,14 +106,10 @@ def setup_stealth():
         })
         
         bot.set_locale("en_IN")
-        bot.set_timezone_offset(19800)  # IST
-        bot.nonce = str(random.randint(1000000, 9999999))
-        
+        bot.set_timezone_offset(19800)
+
     except Exception as e:
         print(f"🛑 Stealth Error: {str(e)[:100]}")
-        if PROXIES:
-            PROXIES.remove(proxy)
-            print(f"Removed bad proxy: {proxy} | Remaining: {len(PROXIES)}")
 
 # ---- Session Management ----
 def load_session():
@@ -133,21 +118,11 @@ def load_session():
         if session_data:
             decoded = base64.b64decode(session_data).decode()
             bot.set_settings(json.loads(decoded))
-            if not validate_session():
-                print("🔄 Session expired, re-login required")
-                return False
             print("✅ Session loaded")
             return True
     except Exception as e:
         print(f"❌ Session Error: {str(e)[:50]}")
     return False
-
-def validate_session():
-    try:
-        bot.get_timeline_feed()
-        return True
-    except:
-        return False
 
 def save_session():
     try:
@@ -162,21 +137,18 @@ def handle_challenge():
     try:
         print("🔐 Solving security challenge...")
         bot.challenge_resolve(bot.last_challenge_path)
-        if bot.challenge_complete():
-            print("✅ Challenge passed")
-            return True
+        return bot.challenge_complete()
     except Exception as e:
         print(f"❌ Challenge Error: {str(e)[:100]}")
-    return False
+        return False
 
 def login():
-    for attempt in range(5):
+    for attempt in range(3):
         try:
             setup_stealth()
-            if load_session() and validate_session():
+            if load_session() and bot.user_id:
                 return True
                 
-            print(f"🔑 Login attempt {attempt+1}/5")
             login_response = bot.login(USERNAME, PASSWORD)
             
             if login_response.get("challenge_required"):
@@ -184,34 +156,26 @@ def login():
                     save_session()
                     return True
                     
-            if login_response.get("authenticated"):
-                save_session()
-                print("✅ Login successful")
-                return True
+            save_session()
+            print("✅ Login successful")
+            return True
                 
-        except (LoginRequired, ChallengeRequired) as e:
-            print(f"⚠️ Login Issue: {str(e)[:100]}")
-            time.sleep(random.randint(15, 45))
         except Exception as e:
-            print(f"🚨 Critical Error: {str(e)[:100]}")
-            time.sleep(random.randint(30, 90))
-    
-    print("❌ Maximum login attempts reached")
+            print(f"🚨 Login Error: {str(e)[:100]}")
+            time.sleep(random.randint(30, 60))
     return False
 
 # ---- Human-like Behavior ----
 def human_delay():
-    time.sleep(random.uniform(1.5, random.choice([3.2, 4.7, 6.1])))
+    time.sleep(random.uniform(1.5, 4.5))
 
 def random_activity():
-    actions = [
-        lambda: bot.feed_timeline(),
-        lambda: bot.user_following(bot.user_id, count=random.randint(1,3)),
-        lambda: bot.get_recent_activity()
-    ]
-    if random.random() < 0.4:
-        random.choice(actions)()
-        human_delay()
+    if random.random() < 0.3:
+        try:
+            bot.feed_timeline()
+            human_delay()
+        except:
+            pass
 
 # ---- Group Management ----
 def process_group(thread):
@@ -219,9 +183,9 @@ def process_group(thread):
         random_activity()
         now = datetime.now(IST)
         
-        messages = bot.direct_messages(thread_id=thread.id, amount=random.randint(8,12))
+        messages = bot.direct_messages(thread_id=thread.id, amount=10)
         
-        # Revival System
+        # Revival Logic
         last_msg = next((msg for msg in messages if msg.item_type != 'action'), None)
         if last_msg:
             last_time = last_msg.timestamp.astimezone(IST)
@@ -234,7 +198,6 @@ def process_group(thread):
 
         # Message Processing
         for msg in messages:
-            # New Member Handling
             if msg.item_type == 'action' and 'added' in msg.text.lower():
                 for user in msg.users:
                     if should_welcome(str(user.pk)):
@@ -244,7 +207,6 @@ def process_group(thread):
                         print(f"🎉 Welcomed @{user.username}")
                         human_delay()
 
-            # Bad Word Filter
             elif msg.item_type == 'text':
                 text = msg.text.lower()
                 if any(bad_word in text for bad_word in BAD_WORDS):
@@ -261,31 +223,28 @@ def process_group(thread):
 
     except Exception as e:
         print(f"❌ Group Error: {str(e)[:100]}")
-        time.sleep(random.randint(30, 90))
 
 # ---- Monitoring System ----
 def monitor_groups():
     error_count = 0
     while True:
         try:
-            check_interval = random.choice([180, 240, 300, 360])  # 3-6 mins
+            check_interval = random.randint(300, 420)  # 5-7 minutes
             print(f"⏳ Next check in {check_interval//60} mins")
             
-            threads = bot.direct_threads(amount=random.randint(15, 25))
-            groups = [t for t in threads if t.is_group]
+            threads = bot.direct_threads(amount=20)
+            for thread in threads:
+                if thread.is_group:
+                    process_group(thread)
+                    time.sleep(random.uniform(10, 20))
             
-            for thread in random.sample(groups, k=min(5, len(groups))):
-                process_group(thread)
-                time.sleep(random.uniform(10, 20))
-                
-            error_count = max(0, error_count-1)
             time.sleep(check_interval)
             
         except Exception as e:
             error_count += 1
-            wait_time = min(error_count * 120, 1800)  # Max 30 mins
-            print(f"🚨 Critical Error: Cooling down {wait_time//60} mins")
-            time.sleep(wait_time + random.randint(-60, 60))
+            wait_time = min(error_count * 60, 1800)
+            print(f"🚨 Cooling down for {wait_time//60} mins")
+            time.sleep(wait_time)
             
             if error_count > 3:
                 print("🔄 Attempting re-login...")
@@ -293,8 +252,8 @@ def monitor_groups():
                     error_count = 0
 
 if __name__ == "__main__":
-    print("\n🚀 Starting Ultra Group Manager v2.0")
+    print("\n🚀 Group Manager 2.0 Started!")
     if login():
         monitor_groups()
     else:
-        print("❌ Critical Login Failure - Check credentials/proxy")
+        print("❌ Critical Login Failure")
