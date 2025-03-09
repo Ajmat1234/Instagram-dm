@@ -1,2 +1,4 @@
-instagrapi==1.16.16  # Latest stable version
+instagrapi==1.16.16
 python-dotenv==1.0.0
+Pillow==10.3.0  # PIL के लिए आवश्यक
+requests==2.31.0
