@@ -125,7 +125,7 @@ def process_group(thread):
         last_msg_time = now
         if messages:
             for msg in messages:
-                if msg.item_type != 'action':  # Changed here
+                if msg.item_type != 'action':  
                     last_msg_time = msg.timestamp.astimezone(IST)
                     break
 
@@ -138,7 +138,7 @@ def process_group(thread):
         # Process messages
         for msg in messages:
             # New member check
-            if msg.item_type == 'action' and 'added' in msg.text.lower():  # Changed here
+            if msg.item_type == 'action' and 'added' in msg.text.lower():  
                 for user in msg.users:
                     if should_welcome(str(user.pk)):
                         bot.direct_send(
@@ -149,14 +149,18 @@ def process_group(thread):
                         print(f"🎉 Welcomed @{user.username}")
 
             # Bad word check
-            elif msg.item_type == 'text':  # Changed here
+            elif msg.item_type == 'text':  
                 text = msg.text.lower()
                 if any(word in text for word in BAD_WORDS):
-                    if msg.user_id != bot.user_id and msg.user.pk not in warned_users:
-                        user = f"@{msg.user.username}"
-                        bot.direct_send(random.choice(WARNINGS).format(user=user), thread_ids=[thread.id])
-                        warned_users.add(msg.user.pk)
-                        print(f"⚠️ Warned {user}")
+                    if msg.user_id != bot.user_id and msg.user_id not in warned_users:
+                        try:
+                            user_info = bot.user_info(msg.user_id)  # Get user info
+                            user = f"@{user_info.username}"  
+                            bot.direct_send(random.choice(WARNINGS).format(user=user), thread_ids=[thread.id])
+                            warned_users.add(msg.user_id)
+                            print(f"⚠️ Warned {user}")
+                        except Exception as e:
+                            print(f"❌ Error fetching user info: {e}")
 
     except Exception as e:
         print(f"❌ Error in {thread.id}: {str(e)[:100]}")
