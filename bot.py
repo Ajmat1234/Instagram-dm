@@ -62,27 +62,31 @@ if not login():
     exit("❌ Could not login")
 
 # ---- Group Chat Settings ----
-GC_CHECK_INTERVAL = 300
-GC_DEAD_TIME = 1200
+GC_CHECK_INTERVAL = 300  # 5 minutes
+GC_DEAD_TIME = 1200     # 20 minutes
 
-# ---- Messages ----
+# ---- Enhanced Messages ----
 FUNNY_REVIVE = [
-    "Yeh gc toh kab ka mar gaya tha, koi zinda hai? 💀",
-    "Chat khatam, sab so gaye kya? 😴",
-    "Aree koi baat karo na... Ghosting mat karo yaar! 👻"
+    "Ye group toh kab ka सोया पड़ा है! कोई जिंदा दिखाई नहीं दे रहा 😴",
+    "अरे यार! बात करो ना... गूगल मैप्स बन गए क्या ये चैट? 🗺️",
+    "Admin जी! ये ग्रुप अब म्यूजियम में डिस्प्ले के लिए तैयार है 🏛️",
+    "चुप्पी का सुनामी आ गया क्या? 🌊"
 ]
 
 WARNINGS = [
-    "Mind your language {user}! @king_of_status_4u_ will ban you! ⚠️",
-    "Gaali dena band karo {user}! 🚫"
+    "{user} भाई! भाषा संभाल के... वार्निंग दे रहा हूं! ⚠️",
+    "ऐसे शब्द नहीं चलेंगे {user}! @king_of_status_4u_ को शिकायत कर दूंगा! 🚫",
+    "ये कैसी बोली {user}? थोड़ा संयम रखो यार! 😠"
 ]
 
 WELCOME_MSG = [
-    "Welcome {user}! Dil ki gali me aapka swagat hai! 🎉",
-    "{user} aa gaya! Ab party shuru karo! 🥳"
+    "नमस्ते {user}! हमारे मस्ती भरे ग्रुप में आपका स्वागत है! 🎉",
+    "ओए {user}! मेम्स लेकर आए हो ना? 😂",
+    "{user} आ गया रे! अब पार्टी शुरू! 🕺💃",
+    "हैलो {user}! ग्रुप रूल्स पढ़ लेना, वरना... 😉"
 ]
 
-BAD_WORDS = ['mc', 'bc', 'chutiya', 'gandu', 'bhosdi', 'madarchod']
+BAD_WORDS = ['mc', 'bc', 'chutiya', 'gandu', 'bhosdi', 'madarchod', 'lavde', 'randi']
 
 # ---- Tracking ----
 gc_activity = {}
@@ -90,48 +94,56 @@ warned_users = set()
 joined_users = set()
 
 def process_group_chat(thread):
-    thread_id = thread.id
-    last_active = gc_activity.get(thread_id, datetime.now() - timedelta(minutes=21))
-    
-    if (datetime.now() - last_active).total_seconds() > GC_DEAD_TIME:
-        msg = random.choice(FUNNY_REVIVE)
-        bot.direct_send(msg, thread_ids=[thread_id])
-        print(f"💀 Revived {thread.title}")
-        gc_activity[thread_id] = datetime.now()
-        return
-    
-    messages = bot.direct_thread_messages(thread_id, amount=20)
-    for msg in messages:
-        if any(word in msg.text.lower() for word in BAD_WORDS) and msg.user_id != bot.user_id:
-            user = f"@{msg.user.username}"
-            bot.direct_send(random.choice(WARNINGS).format(user=user), thread_ids=[thread_id])
-            warned_users.add(msg.user.pk)
+    try:
+        thread_id = thread.id
+        last_active = gc_activity.get(thread_id, datetime.now() - timedelta(minutes=21))
         
-        if msg.item_type == 'action' and 'joined' in msg.text:
-            if msg.user.pk not in joined_users:
-                bot.direct_send(random.choice(WELCOME_MSG).format(user=f"@{msg.user.username}"), thread_ids=[thread_id])
-                joined_users.add(msg.user.pk)
+        # Check inactivity
+        if (datetime.now() - last_active).total_seconds() > GC_DEAD_TIME:
+            msg = random.choice(FUNNY_REVIVE)
+            bot.direct_send(msg, thread_ids=[thread_id])
+            print(f"💀 Revived: {thread.title}")
+            gc_activity[thread_id] = datetime.now()
+            return
+        
+        # Process messages
+        messages = bot.direct_thread_messages(thread_id, amount=25)
+        for msg in messages:
+            # Check bad words
+            if msg.text and any(word in msg.text.lower() for word in BAD_WORDS):
+                if msg.user_id != bot.user_id and msg.user.pk not in warned_users:
+                    user = f"@{msg.user.username}"
+                    bot.direct_send(random.choice(WARNINGS).format(user=user), thread_ids=[thread_id])
+                    warned_users.add(msg.user.pk)
+                    print(f"⚠️ Warned {user}")
+            
+            # Check new members
+            if msg.item_type == 'action' and 'added' in msg.text:
+                new_user = next((u for u in msg.users if u.pk not in joined_users), None)
+                if new_user:
+                    bot.direct_send(random.choice(WELCOME_MSG).format(user=f"@{new_user.username}"), thread_ids=[thread_id])
+                    joined_users.add(new_user.pk)
+                    print(f"🎉 Welcomed @{new_user.username}")
+    
+    except Exception as e:
+        print(f"❌ Error in {thread.title}: {str(e)[:50]}")
 
 def monitor_groups():
     while True:
         try:
-            print("\n🔍 Checking group chats...")
-            # सभी threads लो और group वाले filter करो
+            print("\n🔍 Scanning all group chats...")
             all_threads = bot.direct_threads()
-            group_threads = [t for t in all_threads if t.type == 'group']
+            group_threads = [t for t in all_threads if t.is_group]
             
             for thread in group_threads:
-                try:
-                    process_group_chat(thread)
-                except Exception as e:
-                    print(f"❌ Error processing {thread.title}: {e}")
+                process_group_chat(thread)
             
             time.sleep(GC_CHECK_INTERVAL)
             
         except Exception as e:
-            print(f"❌ Critical error: {e}")
+            print(f"❌ Critical error: {str(e)[:100]}")
             time.sleep(60)
 
 if __name__ == "__main__":
-    print("\n🚀 Bot Started!")
+    print("\n🚀 Instagram Group Manager Started!")
     monitor_groups()
