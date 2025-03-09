@@ -16,8 +16,8 @@ SESSION_ENV_VAR = "INSTA_SESSION_DATA"
 
 # ---- Proxy Settings ----
 PROXIES = [
-    "http://212.69.125.33:80",      # Replace :80 with actual port if needed
-    "http://50.231.110.26:3128",   # Example with port
+    "http://212.69.125.33:80",
+    "http://50.231.110.26:3128",
     "http://189.202.188.149:8080",
     "http://50.175.123.230:80",
     "http://50.218.208.10:80",
@@ -25,17 +25,62 @@ PROXIES = [
     "http://50.207.199.83:80",
     "http://50.221.230.186:80",
     "http://185.172.214.112:80",
-    "http://49.207.36.81:80"        # India proxy
+    "http://49.207.36.81:80"  # India proxy
 ]
 
 # ---- Initialize Client ----
 bot = Client()
-bot.delay_range = [3, 7]  # More natural delay range
+bot.delay_range = [3, 7]
+IST = pytz.timezone("Asia/Kolkata")
 
-# ---- Advanced Anti-Detection Setup ----
+# ---- Messages ----
+FUNNY_REVIVE = [
+    "Group तो मर गया... कोई ज़िंदा है? 💀",
+    "चुप्पी का सुनामी आ गया क्या? 🌊",
+    "अरे यार! बात करो ना... 👻"
+]
+
+WARNINGS = [
+    "{user} भाई! भाषा संभालो! ⚠️",
+    "ऐसे शब्द नहीं चलेंगे {user}! 🚫"
+]
+
+WELCOME_MSGS = [
+    "नमस्ते {user}! स्वागत है! 🎉",
+    "{user} आया ओए! पार्टी शुरू! 🥳",
+    "😍 {user}, TUSSI AA GYE HO TO MUJHE CHHOD KR N JAANA! 🥺"
+]
+
+BAD_WORDS = ['mc', 'bc', 'chutiya', 'gandu', 'bhosdi', 'madarchod']
+
+# ---- Tracking ----
+TRACKING_FILE = "user_track.json"
+last_revive_time = {}
+warned_users = set()
+
+def load_users():
+    try:
+        with open(TRACKING_FILE, "r") as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
+def save_user(user_id):
+    users = load_users()
+    users[user_id] = datetime.now(IST).isoformat()
+    with open(TRACKING_FILE, "w") as f:
+        json.dump(users, f)
+
+def should_welcome(user_id):
+    users = load_users()
+    if user_id not in users:
+        return True
+    last_mentioned = datetime.fromisoformat(users[user_id]).astimezone(IST)
+    return datetime.now(IST) - last_mentioned > timedelta(hours=12)
+
+# ---- Anti-Detection Setup ----
 def setup_stealth():
     try:
-        # Random device fingerprint
         bot.set_device({
             "app_version": "121.0.0.29.119",
             "android_version": random.randint(25, 30),
@@ -49,13 +94,9 @@ def setup_stealth():
             "user_agent": ""
         })
         
-        # Rotate proxy
         if PROXIES:
-            proxy = random.choice(PROXIES)
-            bot.set_proxy(proxy)
-            print(f"🔁 Using proxy: {proxy}")
+            bot.set_proxy(random.choice(PROXIES))
         
-        # Randomize identifiers
         bot.set_uuids({
             "phone_id": str(uuid.uuid4()),
             "uuid": str(uuid.uuid4()),
@@ -63,52 +104,48 @@ def setup_stealth():
             "advertising_id": str(uuid.uuid4()),
         })
         
-        # Location settings
         bot.set_locale("en_IN")
-        bot.set_timezone_offset(19800)  # IST offset
+        bot.set_timezone_offset(19800)
         bot.nonce = str(random.randint(1000000, 9999999))
         
     except Exception as e:
-        print(f"⚠️ Stealth error: {str(e)[:50]}")
+        print(f"Stealth Error: {str(e)[:50]}")
 
 # ---- Session Management ----
 def load_session_from_env():
     try:
         session_data = os.getenv(SESSION_ENV_VAR)
         if session_data:
-            decoded = base64.b64decode(session_data).decode('utf-8')
+            decoded = base64.b64decode(session_data).decode()
             bot.set_settings(json.loads(decoded))
             print("✅ Session loaded")
             return True
     except Exception as e:
-        print(f"❌ Session load error: {str(e)[:50]}")
+        print(f"Session Error: {str(e)[:50]}")
     return False
 
 def save_session_to_env():
     try:
         session_json = json.dumps(bot.get_settings())
         encoded = base64.b64encode(session_json.encode()).decode()
-        print(f"🔑 New session: {encoded[:30]}...")  # Truncated for security
+        print(f"🔑 New Session: {encoded[:30]}...")
     except Exception as e:
-        print(f"❌ Session save failed: {str(e)[:50]}")
+        print(f"Save Failed: {str(e)[:50]}")
 
-# ---- Enhanced Login Flow ----
+# ---- Enhanced Login ----
 def handle_challenge():
     try:
-        print("⏳ Solving challenge...")
-        # Simple email-based challenge solve
         bot.challenge_resolve(bot.last_challenge_path)
         return bot.challenge_complete()
     except Exception as e:
-        print(f"❌ Challenge error: {str(e)[:50]}")
+        print(f"Challenge Error: {str(e)[:50]}")
         return False
 
 def login():
-    for attempt in range(3):
+    for _ in range(3):
         try:
             setup_stealth()
             if load_session_from_env() and bot.user_id:
-                print("✅ Session is valid")
                 return True
                 
             login_response = bot.login(USERNAME, PASSWORD)
@@ -118,19 +155,17 @@ def login():
                     return True
                     
             save_session_to_env()
-            print("✅ Login successful")
             return True
             
         except (LoginRequired, ChallengeRequired) as e:
-            print(f"⚠️ Login issue: {str(e)[:50]}")
+            print(f"Login Issue: {str(e)[:50]}")
             time.sleep(random.randint(10, 30))
         except Exception as e:
-            print(f"❌ Login attempt {attempt+1} failed: {str(e)[:50]}")
+            print(f"Login Failed: {str(e)[:50]}")
             time.sleep(random.randint(20, 40))
-            
     return False
 
-# ---- Human Behavior Simulation ----
+# ---- Human Behavior ----
 def human_delay():
     time.sleep(random.uniform(1.2, 4.8))
 
@@ -138,50 +173,68 @@ def random_activity():
     if random.random() < 0.25:
         try:
             bot.feed_timeline()
-            print("📰 Simulated feed view")
             human_delay()
         except:
             pass
 
-# ---- Group Management Logic ----
-GC_CHECK_INTERVAL = random.randint(250, 350)  # 4-6 minutes variance
-GC_DEAD_TIME = 1200
-TRACKING_FILE = "user_track.json"
-
-# ... (Keep your original message arrays and tracking functions as-is)
-
+# ---- Group Logic ----
 def process_group(thread):
     try:
         random_activity()
-        human_delay()
+        now = datetime.now(IST)
         
-        # Original group processing logic
         messages = bot.direct_messages(thread_id=thread.id, amount=random.randint(8,12))
         
-        # Revival logic
+        # Revival Logic
         last_msg = next((msg for msg in messages if msg.item_type != 'action'), None)
         if last_msg:
-            last_time = last_msg.timestamp.astimezone(pytz.utc)
-            if (datetime.now(pytz.utc) - last_time).total_seconds() > GC_DEAD_TIME:
-                bot.direct_send(random.choice(FUNNY_REVIVE), thread_ids=[thread.id])
-                print(f"💀 Revived {thread.id}")
-                human_delay()
-        
-        # Message processing
+            last_time = last_msg.timestamp.astimezone(IST)
+            if (now - last_time).total_seconds() > 1200:
+                if thread.id not in last_revive_time or (now - last_revive_time[thread.id]).total_seconds() > 1200:
+                    bot.direct_send(random.choice(FUNNY_REVIVE), thread_ids=[thread.id])
+                    last_revive_time[thread.id] = now
+                    print(f"💀 Revived {thread.id}")
+                    human_delay()
+
+        # Message Processing
         for msg in messages:
-            # Your original message handling logic
-            human_delay()
-            
+            # New Member Check
+            if msg.item_type == 'action' and 'added' in msg.text.lower():
+                for user in msg.users:
+                    if should_welcome(str(user.pk)):
+                        bot.direct_send(
+                            random.choice(WELCOME_MSGS).format(user=f"@{user.username}"),
+                            thread_ids=[thread.id]
+                        )
+                        save_user(str(user.pk))
+                        print(f"🎉 Welcomed @{user.username}")
+                        human_delay()
+
+            # Bad Word Check
+            elif msg.item_type == 'text':
+                text = msg.text.lower()
+                if any(word in text for word in BAD_WORDS):
+                    if msg.user_id != bot.user_id and msg.user_id not in warned_users:
+                        try:
+                            user_info = bot.user_info(msg.user_id)
+                            user = f"@{user_info.username}"
+                            bot.direct_send(random.choice(WARNINGS).format(user=user), thread_ids=[thread.id])
+                            warned_users.add(msg.user_id)
+                            print(f"⚠️ Warned {user}")
+                            human_delay()
+                        except Exception as e:
+                            print(f"User Info Error: {str(e)[:50]}")
+
     except Exception as e:
-        print(f"❌ Group error: {str(e)[:50]}")
+        print(f"Group Error: {str(e)[:50]}")
         time.sleep(random.randint(30, 60))
 
 def monitor_groups():
     error_count = 0
     while True:
         try:
-            check_interval = GC_CHECK_INTERVAL * random.uniform(0.8, 1.2)
-            print(f"⏳ Next check in {check_interval//60} mins")
+            check_interval = random.randint(250, 350) * random.uniform(0.8, 1.2)
+            print(f"⏳ Next Check: {check_interval//60} mins")
             
             threads = bot.direct_threads(amount=random.randint(15, 25))
             for thread in random.sample(threads, k=min(3, len(threads))):
@@ -194,14 +247,13 @@ def monitor_groups():
             
         except Exception as e:
             error_count += 1
-            wait_time = 60 * min(error_count, 10)  # Max 10 minute wait
-            print(f"⚠️ Error {error_count}: Cooling down {wait_time//60} mins")
+            wait_time = 60 * min(error_count, 10)
+            print(f"⚠️ Cooling Down: {wait_time//60} mins")
             time.sleep(wait_time + random.randint(-30, 30))
 
-# ---- Main Execution ----
 if __name__ == "__main__":
-    print("🚀 Starting Enhanced Bot...")
+    print("🚀 Starting Smart Group Manager")
     if login():
         monitor_groups()
     else:
-        print("❌ Critical login failure")
+        print("❌ Critical Login Failure")
