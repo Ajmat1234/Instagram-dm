@@ -81,10 +81,10 @@ def setup_stealth():
         }
         bot.set_device(device_config)
 
-        if PROXIES:
-            proxy = random.choice(PROXIES)
-            bot.set_proxy(proxy)
-            print(f"🌀 Using proxy: {proxy}")
+        #if PROXIES:
+            #proxy = random.choice(PROXIES)
+            #bot.set_proxy(proxy)
+            #print(f" Using proxy: {proxy}")
 
         bot.set_uuids({
             "phone_id": str(uuid.uuid4()),
