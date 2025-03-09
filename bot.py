@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 USERNAME = "kalllu_kaliiyaaa"
 PASSWORD = "Ajmat1234@@@"
 SESSION_ENV_VAR = "INSTA_SESSION_DATA"
+TARGET_GROUP_LINK = "https://ig.me/j/AbadvPz94HkLPUro/"  # Your group link
 
 # ---- Initialize Client ----
 bot = Client()
@@ -24,126 +25,126 @@ def load_session_from_env():
             decoded_bytes = base64.b64decode(session_data.encode('utf-8'))
             decoded_str = decoded_bytes.decode('utf-8')
             bot.set_settings(json.loads(decoded_str))
-            print("✅ Session loaded from environment")
+            print("✅ Session loaded")
             return True
         except Exception as e:
-            print(f"⚠️ Session load failed: {e}")
+            print(f"⚠️ Session error: {e}")
     return False
 
 def save_session_to_env():
     try:
         session_json = json.dumps(bot.get_settings())
         encoded = base64.b64encode(session_json.encode('utf-8')).decode('utf-8')
-        print(f"👉 NEW SESSION DATA:\n{encoded}")
+        print(f"👉 NEW SESSION:\n{encoded}")
     except Exception as e:
-        print(f"❌ Failed to save session: {e}")
+        print(f"❌ Save failed: {e}")
 
-# ---- Login Function ----
+# ---- Login ----
 def login():
     try:
-        if load_session_from_env():
-            bot.login(USERNAME, PASSWORD)
-            print("✅ Logged in via session")
+        if load_session_from_env() and bot.login(USERNAME, PASSWORD):
+            print("✅ Logged in")
             return True
     except (LoginRequired, ChallengeRequired) as e:
-        print(f"⚠️ Session login failed: {e}")
+        print(f"⚠️ Login issue: {e}")
     
     try:
-        print("⚠️ Attempting fresh login...")
+        print("⚠️ New login...")
         bot.login(USERNAME, PASSWORD)
         save_session_to_env()
-        print("✅ Fresh login successful")
         return True
     except Exception as e:
         print(f"❌ Login failed: {e}")
         return False
 
 if not login():
-    exit("❌ Could not login")
+    exit("❌ Login error")
 
-# ---- Group Chat Settings ----
+# ---- Group Settings ----
 GC_CHECK_INTERVAL = 300  # 5 minutes
-GC_DEAD_TIME = 1200     # 20 minutes
+GC_DEAD_TIME = 1200      # 20 minutes
+REVIVE_COOLDOWN = 1200   # 20 minutes cooldown
 
-# ---- Enhanced Messages ----
+# ---- Messages ----
 FUNNY_REVIVE = [
-    "Ye group toh kab ka सोया पड़ा है! कोई जिंदा दिखाई नहीं दे रहा 😴",
-    "अरे यार! बात करो ना... गूगल मैप्स बन गए क्या ये चैट? 🗺️",
-    "Admin जी! ये ग्रुप अब म्यूजियम में डिस्प्ले के लिए तैयार है 🏛️",
-    "चुप्पी का सुनामी आ गया क्या? 🌊"
+    "Group तो मर गया... कोई ज़िंदा है? 💀",
+    "चुप्पी का सुनामी आ गया क्या? 🌊",
+    "अरे यार! बात करो ना... 👻"
 ]
 
 WARNINGS = [
-    "{user} भाई! भाषा संभाल के... वार्निंग दे रहा हूं! ⚠️",
-    "ऐसे शब्द नहीं चलेंगे {user}! @king_of_status_4u_ को शिकायत कर दूंगा! 🚫",
-    "ये कैसी बोली {user}? थोड़ा संयम रखो यार! 😠"
+    "{user} भाई! भाषा संभालो! ⚠️",
+    "ऐसे शब्द नहीं चलेंगे {user}! 🚫"
 ]
 
 WELCOME_MSG = [
-    "नमस्ते {user}! हमारे मस्ती भरे ग्रुप में आपका स्वागत है! 🎉",
-    "ओए {user}! मेम्स लेकर आए हो ना? 😂",
-    "{user} आ गया रे! अब पार्टी शुरू! 🕺💃",
-    "हैलो {user}! ग्रुप रूल्स पढ़ लेना, वरना... 😉"
+    "नमस्ते {user}! स्वागत है! 🎉",
+    "{user} आया ओए! पार्टी शुरू! 🥳"
 ]
 
-BAD_WORDS = ['mc', 'bc', 'chutiya', 'gandu', 'bhosdi', 'madarchod', 'lavde', 'randi']
+BAD_WORDS = ['mc', 'bc', 'chutiya', 'gandu', 'bhosdi', 'madarchod']
 
 # ---- Tracking ----
-gc_activity = {}
+last_revive_time = {}
 warned_users = set()
 joined_users = set()
 
-def process_group_chat(thread):
+def get_target_group():
     try:
-        thread_id = thread.id
-        last_active = gc_activity.get(thread_id, datetime.now() - timedelta(minutes=21))
-        
-        # Check inactivity
-        if (datetime.now() - last_active).total_seconds() > GC_DEAD_TIME:
+        # Extract thread ID from group link
+        thread_id = TARGET_GROUP_LINK.split('/j/')[-1].strip('/')
+        return bot.direct_thread(thread_id)
+    except Exception as e:
+        print(f"❌ Group error: {e}")
+        return None
+
+def process_group(thread):
+    now = datetime.now()
+    thread_id = thread.id
+    
+    # Check last message time
+    messages = bot.direct_thread_messages(thread_id, amount=1)
+    last_msg_time = messages[0].timestamp if messages else now - timedelta(minutes=21)
+    
+    # Revival logic
+    if (now - last_msg_time).total_seconds() > GC_DEAD_TIME:
+        if thread_id not in last_revive_time or (now - last_revive_time[thread_id]).total_seconds() > REVIVE_COOLDOWN:
             msg = random.choice(FUNNY_REVIVE)
             bot.direct_send(msg, thread_ids=[thread_id])
-            print(f"💀 Revived: {thread.title}")
-            gc_activity[thread_id] = datetime.now()
-            return
-        
-        # Process messages
-        messages = bot.direct_thread_messages(thread_id, amount=25)
-        for msg in messages:
-            # Check bad words
-            if msg.text and any(word in msg.text.lower() for word in BAD_WORDS):
-                if msg.user_id != bot.user_id and msg.user.pk not in warned_users:
-                    user = f"@{msg.user.username}"
-                    bot.direct_send(random.choice(WARNINGS).format(user=user), thread_ids=[thread_id])
-                    warned_users.add(msg.user.pk)
-                    print(f"⚠️ Warned {user}")
-            
-            # Check new members
-            if msg.item_type == 'action' and 'added' in msg.text:
-                new_user = next((u for u in msg.users if u.pk not in joined_users), None)
-                if new_user:
-                    bot.direct_send(random.choice(WELCOME_MSG).format(user=f"@{new_user.username}"), thread_ids=[thread_id])
-                    joined_users.add(new_user.pk)
-                    print(f"🎉 Welcomed @{new_user.username}")
+            last_revive_time[thread_id] = now
+            print(f"💀 Revived group")
     
-    except Exception as e:
-        print(f"❌ Error in {thread.title}: {str(e)[:50]}")
+    # Message processing
+    messages = bot.direct_thread_messages(thread_id, amount=20)
+    for msg in messages:
+        # Bad words check
+        if msg.text and any(word in msg.text.lower() for word in BAD_WORDS):
+            if msg.user_id != bot.user_id and msg.user.pk not in warned_users:
+                user = f"@{msg.user.username}"
+                bot.direct_send(random.choice(WARNINGS).format(user=user), thread_ids=[thread_id])
+                warned_users.add(msg.user.pk)
+                print(f"⚠️ Warned {user}")
+        
+        # New member check
+        if msg.item_type == 'action' and 'added' in msg.text:
+            new_user = next((u for u in msg.users if u.pk not in joined_users), None)
+            if new_user:
+                bot.direct_send(random.choice(WELCOME_MSG).format(user=f"@{new_user.username}"), thread_ids=[thread_id])
+                joined_users.add(new_user.pk)
+                print(f"🎉 Welcomed @{new_user.username}")
 
-def monitor_groups():
+def monitor_group():
     while True:
         try:
-            print("\n🔍 Scanning all group chats...")
-            all_threads = bot.direct_threads()
-            group_threads = [t for t in all_threads if t.is_group]
-            
-            for thread in group_threads:
-                process_group_chat(thread)
-            
+            print("\n🔍 Checking group...")
+            group = get_target_group()
+            if group:
+                process_group(group)
             time.sleep(GC_CHECK_INTERVAL)
-            
         except Exception as e:
-            print(f"❌ Critical error: {str(e)[:100]}")
+            print(f"❌ Error: {str(e)[:100]}")
             time.sleep(60)
 
 if __name__ == "__main__":
-    print("\n🚀 Instagram Group Manager Started!")
-    monitor_groups()
+    print("\n🚀 Bot Started!")
+    monitor_group()
