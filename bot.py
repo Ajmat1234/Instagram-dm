@@ -21,7 +21,6 @@ IST = pytz.timezone("Asia/Kolkata")
 
 # ---- Device Spoofing ----
 def setup_stealth():
-def setup_stealth():
     try:
         bot.set_device({
             "app_version": "321.0.0.18.114",
