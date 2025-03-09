@@ -11,7 +11,6 @@ from datetime import datetime, timedelta
 USERNAME = "kalllu_kaliiyaaa"
 PASSWORD = "Ajmat1234@@@"
 SESSION_ENV_VAR = "INSTA_SESSION_DATA"
-TARGET_GROUP_ID = "1234567890123456789"  # Group thread ID (आपको group link से manually निकालना होगा)
 
 # ---- Initialize Client ----
 bot = Client()
@@ -90,20 +89,7 @@ last_revive_time = {}
 warned_users = set()
 joined_users = set()
 
-def get_target_group():
-    try:
-        # अब direct_thread() की जगह direct_threads() से थ्रेड लेंगे
-        threads = bot.direct_threads()
-        for thread in threads:
-            if thread.id == TARGET_GROUP_ID:
-                return thread
-        print("❌ Group ID नहीं मिला")
-        return None
-    except Exception as e:
-        print(f"❌ Group error: {e}")
-        return None
-
-def process_group(thread):
+def process_thread(thread):
     now = datetime.now()
     thread_id = thread.id
     
@@ -117,7 +103,7 @@ def process_group(thread):
             msg = random.choice(FUNNY_REVIVE)
             bot.direct_send(msg, thread_ids=[thread_id])
             last_revive_time[thread_id] = now
-            print(f"💀 Revived group")
+            print(f"💀 Revived chat in {thread_id}")
     
     # Message processing
     for msg in messages:
@@ -137,13 +123,13 @@ def process_group(thread):
                 joined_users.add(new_user.pk)
                 print(f"🎉 Welcomed @{new_user.username}")
 
-def monitor_group():
+def monitor_all_threads():
     while True:
         try:
-            print("\n🔍 Checking group...")
-            group = get_target_group()
-            if group:
-                process_group(group)
+            print("\n🔍 Checking all chats...")
+            threads = bot.direct_threads()
+            for thread in threads:
+                process_thread(thread)
             time.sleep(GC_CHECK_INTERVAL)
         except Exception as e:
             print(f"❌ Error: {str(e)[:100]}")
@@ -151,4 +137,4 @@ def monitor_group():
 
 if __name__ == "__main__":
     print("\n🚀 Bot Started!")
-    monitor_group()
+    monitor_all_threads()
