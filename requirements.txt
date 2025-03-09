@@ -1,2 +1,2 @@
-instagrapi==1.22.1
+instagrapi==1.16.16  # Latest stable version
 python-dotenv==1.0.0
