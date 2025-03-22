@@ -4,6 +4,7 @@ import base64
 import json
 import time
 import shutil
+import uuid
 
 # ✅ Environment Variables
 USERNAME = os.environ.get("USERNAME")
@@ -13,29 +14,55 @@ SESSION_DATA = os.environ.get("SESSION_DATA")
 # ✅ Session Cleanup
 if os.path.exists("config"):
     shutil.rmtree("config")
-    print("🧹 पुराने session files साफ़ किए गए!")
+    print("🧹 पुराने session files डिलीट किए गए!")
 
 # ✅ Bot Initialization
 bot = Bot()
 
-# ✅ Session Format Validator
-def validate_session(session):
-    required = {
-        'cookie': ['ds_user', 'ds_user_id', 'csrftoken'],
-        'mandatory_keys': ['uuid', 'device_settings', 'cookie']
+# ✅ Session Generator (New Fix)
+def generate_new_session():
+    print("🔄 नया session बना रहे हैं...")
+    
+    # Generate fresh UUID
+    new_uuid = str(uuid.uuid4())
+    
+    # Get device settings from API
+    device_settings = {
+        "app_version": "267.0.0.19.301",
+        "android_version": 33,
+        "android_release": "13.0.0",
+        "phone_manufacturer": "OnePlus",
+        "phone_device": "NE2215",
+        "phone_dpi": "420dpi",
+        "phone_resolution": "1080x2260",
+        "phone_chipset": "Snapdragon 8 Gen 1"
     }
     
-    # Check top-level keys
-    for key in required['mandatory_keys']:
-        if key not in session:
+    # Create complete session structure
+    new_session = {
+        "uuid": new_uuid,
+        "cookie": bot.api.cookie_jar.get_cookies_dict(),
+        "device_settings": device_settings
+    }
+    
+    # Add mandatory Instagram fields
+    new_session['cookie']['ds_user'] = USERNAME
+    new_session['cookie']['ds_user_id'] = bot.user_id
+    new_session['cookie']['csrftoken'] = bot.api.token
+    
+    return new_session
+
+# ✅ Session Validation
+def validate_session(data):
+    required_keys = ['uuid', 'cookie', 'device_settings']
+    for key in required_keys:
+        if key not in data:
             raise ValueError(f"Missing key: {key}")
     
-    # Check cookie keys
-    for key in required['cookie']:
-        if key not in session['cookie']:
+    cookie_keys = ['ds_user', 'ds_user_id', 'csrftoken']
+    for key in cookie_keys:
+        if key not in data['cookie']:
             raise ValueError(f"Cookie में {key} missing")
-    
-    return True
 
 # ✅ Session Handler
 def handle_sessions():
@@ -43,47 +70,43 @@ def handle_sessions():
         try:
             print("🔁 Session डिकोड कर रहे हैं...")
             decoded = json.loads(base64.b64decode(SESSION_DATA))
-            
-            # Validate format
             validate_session(decoded)
             
             # Save session file
             os.makedirs("config", exist_ok=True)
-            session_file = f"config/{USERNAME}_uuid_and_cookie.json"
-            
-            with open(session_file, 'w') as f:
+            with open(f"config/{USERNAME}_uuid_and_cookie.json", "w") as f:
                 json.dump(decoded, f, indent=2)
             
-            print("✅ Session format valid!")
+            # Force reload session
+            bot.api.uuid = decoded['uuid']
+            bot.api.device_settings = decoded['device_settings']
+            bot.api.set_cookies(decoded['cookie'])
             
-            # Login with session
-            if bot.login(username=USERNAME, password=PASSWORD, use_cookie=True):
-                print("🔄 Session से login सफल!")
-                return True
-                
+            print("✅ Session restore successful!")
+            return True
+            
         except Exception as e:
             print(f"❌ Session error: {str(e)}")
             return False
             
-    # Fresh login
-    print("🔐 नया login शुरू कर रहे हैं...")
+    # Fresh login flow
     if bot.login(username=USERNAME, password=PASSWORD):
-        # Get NEW session data
-        new_session = bot.api.get_uuid_and_cookie()
+        new_session = generate_new_session()
         
-        # Add required fields (new fix)
-        new_session['cookie']['ds_user'] = USERNAME
-        new_session['device_settings'] = bot.api.device_settings
-        
-        # Generate new session data
+        # Save and encode session
         encoded = base64.b64encode(json.dumps(new_session).encode()).decode()
         print(f"🆕 NEW_SESSION_DATA:\n{encoded}")
+        
+        # Save locally for next run
+        with open(f"config/{USERNAME}_uuid_and_cookie.json", "w") as f:
+            json.dump(new_session, f)
+            
         return True
         
     return False
 
 # ✅ Main Execution
 if not handle_sessions():
-    raise SystemExit("❌ Login असफल, स्क्रिप्ट बंद की जा रही है")
+    raise SystemExit("❌ Login failed, stopping script")
 
-# ... (rest of the code same as previous)
+# ... (बाकी का कोड पहले जैसा ही रहेगा)
