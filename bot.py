@@ -3,102 +3,85 @@ import os
 import base64
 import json
 import time
+import shutil
 
-# ✅ Environment Variables from Railway
+# ✅ Environment Variables
 USERNAME = os.environ.get("USERNAME")
 PASSWORD = os.environ.get("PASSWORD")
 SESSION_DATA = os.environ.get("SESSION_DATA")
 
-# ✅ Bot Initialization with Fresh Session
-bot = Bot(clear_session=True)  # Important for session reset
+# ✅ Session Cleanup (New Fix)
+if os.path.exists("config"):
+    shutil.rmtree("config")
+    print("🧹 Old session files cleaned!")
 
-# ✅ Improved Session Handling
+# ✅ Bot Initialization (Corrected)
+bot = Bot()  # Removed clear_session parameter
+
+# ✅ Improved Session Handler
 def handle_sessions():
-    global bot
     if SESSION_DATA:
         try:
-            print("🔁 Decoding Session Data...")
-            decoded_data = base64.b64decode(SESSION_DATA).decode()
-            session_json = json.loads(decoded_data)
+            print("🔁 Decoding Session...")
+            decoded = json.loads(base64.b64decode(SESSION_DATA))
             
-            # ✅ Validate Session Structure
-            required_keys = ['uuid', 'cookie', 'device_settings']
-            if not all(key in session_json for key in required_keys):
-                raise ValueError("Invalid session structure")
+            # Validate session structure
+            if 'cookie' not in decoded or 'ds_user' not in decoded['cookie']:
+                raise ValueError("Invalid session format")
                 
-            if 'ds_user' not in session_json['cookie']:
-                raise KeyError("ds_user missing in cookie")
-
-            # ✅ Save Session Properly
-            session_path = f"config/{USERNAME}_uuid_and_cookie.json"
+            # Save session file
             os.makedirs("config", exist_ok=True)
+            session_file = f"config/{USERNAME}_uuid_and_cookie.json"
             
-            with open(session_path, 'w') as f:
-                json.dump(session_json, f)
+            with open(session_file, 'w') as f:
+                json.dump(decoded, f)
                 
-            print("💾 Session Restored from ENV")
-            
-            # ✅ Advanced Login with Session
+            # Login with session
             if bot.login(username=USERNAME, password=PASSWORD, use_cookie=True):
-                print("✅ Login Success with Restored Session!")
+                print("✅ Session login successful!")
                 return True
                 
         except Exception as e:
-            print(f"❌ Session Error: {str(e)}")
-    
-    # ✅ Fresh Login if Session Fails
-    print("🔐 Starting Fresh Login...")
+            print(f"❌ Session error: {str(e)}")
+            return False
+            
+    # Fresh login if no session
+    print("🔐 Starting fresh login...")
     if bot.login(username=USERNAME, password=PASSWORD):
-        new_session = bot.api.get_uuid_and_cookie()  # Get updated session format
-        bot.save_session()  # Save properly for next time
-        
-        # ✅ Encode New Session for Railway
-        encoded_session = base64.b64encode(json.dumps(new_session).encode()).decode()
-        print(f"🆕 NEW_SESSION_DATA: {encoded_session}")
+        new_session = bot.api.get_uuid_and_cookie()
+        encoded = base64.b64encode(json.dumps(new_session).encode()).decode()
+        print(f"🆕 NEW_SESSION_DATA: {encoded}")
         return True
         
     return False
 
-# ✅ Execute Session Handling
+# ✅ Main Execution
 if not handle_sessions():
-    raise Exception("❌ Critical Login Failure")
+    raise SystemExit("❌ Login failed, stopping script")
 
-# ✅ Safe DM Functions (Updated)
-def smart_delay(actions_count):
-    base_delay = max(30, 10 * actions_count)
-    randomized_delay = base_delay + int(time.time() % 30)
-    print(f"⏳ Smart Delay: {randomized_delay}s")
-    time.sleep(randomized_delay)
+# ✅ DM Configuration
+EXCLUDED = ["SHANSKARI_BALAK 👻💯"]
+TARGETS = [u for u in ["user1", "user2", "user3", "SHANSKARI_BALAK 👻💯"] if u not in EXCLUDED]
+MESSAGE = "https://ig.me/j/AbadvPz94HkLPUro/"
 
-def safe_dm(user, message, count):
+# ✅ Smart Sending Logic
+MAX_DMS = 30
+SENT = 0
+
+for i, user in enumerate(TARGETS):
     try:
-        if bot.send_message(message, [user]):
-            print(f"✉️ Sent to {user}")
-            smart_delay(count)
-            return True
+        if SENT >= MAX_DMS:
+            print("💤 Daily limit reached, sleeping 24h...")
+            time.sleep(86400)
+            SENT = 0
+            
+        bot.send_message(MESSAGE, [user])
+        print(f"✉️ Sent to {user} ({i+1}/{len(TARGETS)})")
+        SENT += 1
+        time.sleep(30 + (i * 2))  # Progressive delay
+        
     except Exception as e:
-        print(f"⚠️ Failed {user}: {str(e)}")
-        time.sleep(120)  # Extra cooling period on failure
-    return False
-
-# ✅ Targets Configuration
-EXCLUDED_USERS = ["SHANSKARI_BALAK 👻💯"]
-TARGET_LIST = ["user1", "user2", "user3", "SHANSKARI_BALAK 👻💯"]
-MESSAGE_TEXT = "https://ig.me/j/AbadvPz94HkLPUro/"
-
-# ✅ Intelligent Sending Logic
-MAX_DAILY = 30
-DAILY_COOLDOWN = 86400  # 24 hours in seconds
-action_counter = 0
-
-# ✅ Main Execution Loop
-for idx, user in enumerate([u for u in TARGET_LIST if u not in EXCLUDED_USERS]):
-    if action_counter >= MAX_DAILY:
-        print(f"🌙 Daily limit reached. Sleeping {DAILY_COOLDOWN//3600} hours...")
-        time.sleep(DAILY_COOLDOWN)
-        action_counter = 0
+        print(f"⚠️ Error with {user}: {str(e)}")
+        time.sleep(120)
         
-    if safe_dm(user, MESSAGE_TEXT, idx+1):
-        action_counter += 1
-        
-print("🎉 Mission Completed!") 
+print("🎉 All messages processed!")
