@@ -1,77 +1,16 @@
 from instabot import Bot
-import time
-import os
 import base64
+import json
 
-# ✅ Environment Variables from Railway.com
-USERNAME = os.environ.get("USERNAME")
-PASSWORD = os.environ.get("PASSWORD")
-SESSION_DATA = os.environ.get("SESSION_DATA")
-
-# ✅ Bot Initialization
+# ✅ Bot Init Karo
 bot = Bot()
 
-# ✅ Check if SESSION_DATA is Available
-if SESSION_DATA:
-    print("🔁 Restoring Session from Base64...")
-    decoded_session = base64.b64decode(SESSION_DATA).decode()
+# ✅ Session Ko Decode Karo
+SESSION_DATA = """ewogICAgInV1aWRzIjogewogICAgICAgICJwaG9uZV9pZCI6ICJlNTA3NzNhMi0xNGUwLTRhOTUtOGU0NS03ZjI2NmJhNmNiNjgiLAogICAgICAgICJ1dWlkIjogImY0NjJhMjQ4LTZlZjMtNGVjMy1iYWQ1LWVhNzI2YzQxMmNiZSIsCiAgICAgICAgImNsaWVudF9zZXNzaW9uX2lkIjogImI4ZDhkNGJkLTBjZGEtNDdkYy1hYjk0LTFjNGRkOTRmMjE1NCIsCiAgICAgICAgImFkdmVydGlzaW5nX2lkIjogIjg4Yjc0OGQ2LTY1MjctNDlkMS1iZDgzLTI2MjViOTBmOTRlZSIsCiAgICAgICAgImFuZHJvaWRfZGV2aWNlX2lkIjogImFuZHJvaWQtNzNhN2ZlZjAxY2VjNWRlYSIsCiAgICAgICAgInJlcXVlc3RfaWQiOiAiZjM3ZmViZGYtNmMxYS00ZmIwLTkwZTMtM2RiMWZlNzAxMzJjIiwKICAgICAgICAidHJheV9zZXNzaW9uX2lkIjogImRkZjkxNThkLWFlNmItNGU2OC1iYTdhLTAzNTg5YzdjZWIxZCIKICAgIH0sCiAgICAibWlkIjogIlo5OGZnUUFCQUFHWWN3UGFUX2J2Z2Z0VndDQkUiLAogICAgImlnX3VfcnVyIjogbnVsbCwKICAgICJpZ193d3dfY2xhaW0iOiBudWxsLAogICAgImF1dGhvcml6YXRpb25fZGF0YSI6IHsKICAgICAgICAiZHNfdXNlcl9pZCI6ICI1NzI1NzM3NzA2MyIsCiAgICAgICAgInNlc3Npb25pZCI6ICI1NzI1NzM3NzA2MyUzQWhjbGZMbzdCVElHZGhmJTNBMTMlM0FBWWNtSnpRMEhYbzBIeTJUekVENEJqM2lYd0RzeDVXQ3ZyTV9YMWZjdWciCiAgICB9LAogICAgImNvb2tpZXMiOiB7fSwKICAgICJsYXN0X2xvZ2luIjogMTc0MjY3NTg1MS44NDQ2OTU4LAogICAgImRldmljZV9zZXR0aW5ncyI6IHsKICAgICAgICAiYXBwX3ZlcnNpb24iOiAiMzEyLjAuMC4yNS4xMTkiLAogICAgICAgICJhbmRyb2lkX3ZlcnNpb24iOiAzNCwKICAgICAgICAiYW5kcm9pZF9yZWxlYXNlIjogIjE0LjAuMCIsCiAgICAgICAgImRwaSI6ICI0ODBkcGkiLAogICAgICAgICJyZXNvbHV0aW9uIjogIjEwODB4MjQwMCIsCiAgICAgICAgIm1hbnVmYWN0dXJlciI6ICJzYW1zdW5nIiwKICAgICAgICAiZGV2aWNlIjogIlNNLVM5MThCIiwKICAgICAgICAibW9kZWwiOiAiR2FsYXh5IFMyMyBVbHRyYSIKICAgIH0sCiAgICAidXNlcl9hZ2VudCI6ICJJbnN0YWdyYW0gMjY5LjAuMC4xOC43NSBBbmRyb2lkICgyNi84LjAuMDsgNDgwZHBpOyAxMDgweDE5MjA7IE9uZVBsdXM7IDZUIERldjsgZGV2aXRyb247IHFjb207IGVuX1VTOyAzMTQ2NjUyNTYpIiwKICAgICJjb3VudHJ5IjogIlVTIiwKICAgICJjb3VudHJ5X2NvZGUiOiAxLAogICAgImxvY2FsZSI6ICJlbl9VUyIsCiAgICAidGltZXpvbmVfb2Zmc2V0IjogLTE0NDAwCn0="""
 
-    # ✅ Session ko config folder me save karo
-    session_file_path = "config/{}_uuid_and_cookie.json".format(USERNAME)
-    os.makedirs("config", exist_ok=True)  # Agar config folder nahi hai to banao
-    with open(session_file_path, "w") as file:
-        file.write(decoded_session)
-    
-    print("✅ Session Restored Successfully! Logging in using session...")
-    
-    # ✅ Bot ko session se login karao
-    bot.login(username=USERNAME, password=PASSWORD, use_cookie=True)  # Session use hoga
-else:
-    # ✅ Agar session nahi hai to normal login karo
-    print("🔐 No Session Found, Logging in Normally...")
-    bot.login(username=USERNAME, password=PASSWORD)
-    bot.save_session()
-    print("✅ New Session Saved Successfully!")
+session_json = json.loads(base64.b64decode(SESSION_DATA).decode())
 
-# ✅ Safe Delay Setup to Avoid Detection
-def safe_delay(count):
-    delay = 20 + (5 * count)
-    print(f"🕒 Sleeping for {delay} seconds to avoid detection...")
-    time.sleep(delay)
-
-# ✅ DM Sending Function with Safety Checks
-def send_safe_dm(user, message, count):
-    try:
-        # ✅ Check if User is Valid
-        if bot.get_user_info(user)["is_private"] == False:  # Public Accounts Only
-            bot.send_message(message, [user])
-            print(f"✅ Message sent to {user}")
-            safe_delay(count)
-        else:
-            print(f"🔒 Skipping {user} (Private Account)")
-    except Exception as e:
-        print(f"❌ Error sending to {user}: {e}")
-
-# ✅ Exclude GC Members from DM List
-excluded_gc = ["SHANSKARI_BALAK 👻💯"]  # Members ko DM mat bhejo
-
-# ✅ Target Users List (Add Your Target Usernames Here)
-users_to_message = ["user1", "user2", "user3", "SHANSKARI_BALAK 👻💯"]
-
-# ✅ Filtered User List (Excluding GC Members)
-filtered_users = [user for user in users_to_message if user not in excluded_gc]
-
-# ✅ Safe Daily Limit for DMs
-MAX_DAILY_DMS = 30
-DAILY_SLEEP_TIME = 86400  # 24 hours sleep after limit
-count = 0
-
-# ✅ Start Sending DMs
-for user in filtered_users:
-    if count < MAX_DAILY_DMS:
-        send_safe_dm(user, "https://ig.me/j/AbadvPz94HkLPUro/", count)
-        count += 1
-    else:
-        print("🎉 Daily DM limit reached, sleeping for 24 hours...")
-        time.sleep(DAILY_SLEEP_TIME)
-        count = 0
+# ✅ Session Inject Karo
+bot.api.cookie_dict = session_json
+bot.api.is_logged_in = True
+print("✅ Session Injected Successfully! Ready to Send DMs!")
