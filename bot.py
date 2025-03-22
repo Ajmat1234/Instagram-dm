@@ -1,16 +1,37 @@
 from instabot import Bot
 import base64
 import json
+import os
 
-# ✅ Bot Init Karo
+# ✅ Environment Variables from Railway
+USERNAME = os.environ.get("USERNAME")
+PASSWORD = os.environ.get("PASSWORD")
+SESSION_DATA = os.environ.get("SESSION_DATA")
+
+# ✅ Bot Init
 bot = Bot()
 
-# ✅ Session Ko Decode Karo
-SESSION_DATA = """ewogICAgInV1aWRzIjogewogICAgICAgICJwaG9uZV9pZCI6ICJlNTA3NzNhMi0xNGUwLTRhOTUtOGU0NS03ZjI2NmJhNmNiNjgiLAogICAgICAgICJ1dWlkIjogImY0NjJhMjQ4LTZlZjMtNGVjMy1iYWQ1LWVhNzI2YzQxMmNiZSIsCiAgICAgICAgImNsaWVudF9zZXNzaW9uX2lkIjogImI4ZDhkNGJkLTBjZGEtNDdkYy1hYjk0LTFjNGRkOTRmMjE1NCIsCiAgICAgICAgImFkdmVydGlzaW5nX2lkIjogIjg4Yjc0OGQ2LTY1MjctNDlkMS1iZDgzLTI2MjViOTBmOTRlZSIsCiAgICAgICAgImFuZHJvaWRfZGV2aWNlX2lkIjogImFuZHJvaWQtNzNhN2ZlZjAxY2VjNWRlYSIsCiAgICAgICAgInJlcXVlc3RfaWQiOiAiZjM3ZmViZGYtNmMxYS00ZmIwLTkwZTMtM2RiMWZlNzAxMzJjIiwKICAgICAgICAidHJheV9zZXNzaW9uX2lkIjogImRkZjkxNThkLWFlNmItNGU2OC1iYTdhLTAzNTg5YzdjZWIxZCIKICAgIH0sCiAgICAibWlkIjogIlo5OGZnUUFCQUFHWWN3UGFUX2J2Z2Z0VndDQkUiLAogICAgImlnX3VfcnVyIjogbnVsbCwKICAgICJpZ193d3dfY2xhaW0iOiBudWxsLAogICAgImF1dGhvcml6YXRpb25fZGF0YSI6IHsKICAgICAgICAiZHNfdXNlcl9pZCI6ICI1NzI1NzM3NzA2MyIsCiAgICAgICAgInNlc3Npb25pZCI6ICI1NzI1NzM3NzA2MyUzQWhjbGZMbzdCVElHZGhmJTNBMTMlM0FBWWNtSnpRMEhYbzBIeTJUekVENEJqM2lYd0RzeDVXQ3ZyTV9YMWZjdWciCiAgICB9LAogICAgImNvb2tpZXMiOiB7fSwKICAgICJsYXN0X2xvZ2luIjogMTc0MjY3NTg1MS44NDQ2OTU4LAogICAgImRldmljZV9zZXR0aW5ncyI6IHsKICAgICAgICAiYXBwX3ZlcnNpb24iOiAiMzEyLjAuMC4yNS4xMTkiLAogICAgICAgICJhbmRyb2lkX3ZlcnNpb24iOiAzNCwKICAgICAgICAiYW5kcm9pZF9yZWxlYXNlIjogIjE0LjAuMCIsCiAgICAgICAgImRwaSI6ICI0ODBkcGkiLAogICAgICAgICJyZXNvbHV0aW9uIjogIjEwODB4MjQwMCIsCiAgICAgICAgIm1hbnVmYWN0dXJlciI6ICJzYW1zdW5nIiwKICAgICAgICAiZGV2aWNlIjogIlNNLVM5MThCIiwKICAgICAgICAibW9kZWwiOiAiR2FsYXh5IFMyMyBVbHRyYSIKICAgIH0sCiAgICAidXNlcl9hZ2VudCI6ICJJbnN0YWdyYW0gMjY5LjAuMC4xOC43NSBBbmRyb2lkICgyNi84LjAuMDsgNDgwZHBpOyAxMDgweDE5MjA7IE9uZVBsdXM7IDZUIERldjsgZGV2aXRyb247IHFjb207IGVuX1VTOyAzMTQ2NjUyNTYpIiwKICAgICJjb3VudHJ5IjogIlVTIiwKICAgICJjb3VudHJ5X2NvZGUiOiAxLAogICAgImxvY2FsZSI6ICJlbl9VUyIsCiAgICAidGltZXpvbmVfb2Zmc2V0IjogLTE0NDAwCn0="""
-
-session_json = json.loads(base64.b64decode(SESSION_DATA).decode())
-
-# ✅ Session Inject Karo
-bot.api.cookie_dict = session_json
-bot.api.is_logged_in = True
-print("✅ Session Injected Successfully! Ready to Send DMs!")
+# ✅ Session Restore Logic
+if SESSION_DATA:
+    print("🔁 Restoring Session from Base64...")
+    decoded_session = base64.b64decode(SESSION_DATA).decode()
+    
+    # ✅ Session Ko Config Folder Me Save Karo
+    session_file_path = "config/{}_uuid_and_cookie.json".format(USERNAME)
+    os.makedirs("config", exist_ok=True)
+    
+    # ✅ Write Correct Format
+    with open(session_file_path, "w") as file:
+        file.write(decoded_session)
+    
+    # ✅ Login Using Restored Session
+    if bot.login(username=USERNAME, password=PASSWORD, use_cookie=True):
+        print("✅ Session Restored Successfully!")
+    else:
+        print("❌ Session Restore Failed. Normal Login Attempting...")
+        bot.login(username=USERNAME, password=PASSWORD)
+        bot.save_session()
+else:
+    print("🔐 No Session Found. Normal Login Starting...")
+    bot.login(username=USERNAME, password=PASSWORD)
+    bot.save_session()
