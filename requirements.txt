@@ -1,1 +1,4 @@
-instabot
+instabot==0.117.2
+requests==2.27.1
+schedule==1.1.0
+urllib3==1.26.12
