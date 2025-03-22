@@ -18,12 +18,14 @@ if SESSION_DATA:
 
     # ✅ Session ko config folder me save karo
     session_file_path = "config/{}_uuid_and_cookie.json".format(USERNAME)
+    os.makedirs("config", exist_ok=True)  # Agar config folder nahi hai to banao
     with open(session_file_path, "w") as file:
         file.write(decoded_session)
     
+    print("✅ Session Restored Successfully! Logging in using session...")
+    
     # ✅ Bot ko session se login karao
-    bot.load_session()
-    print("✅ Session Restored Successfully!")
+    bot.login(username=USERNAME, password=PASSWORD, use_cookie=True)  # Session use hoga
 else:
     # ✅ Agar session nahi hai to normal login karo
     print("🔐 No Session Found, Logging in Normally...")
