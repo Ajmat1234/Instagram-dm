@@ -1,7 +1,6 @@
 import os
 import base64
 import json
-import shutil
 from instagrapi import Client
 from instagrapi.exceptions import LoginRequired, ChallengeRequired
 
@@ -10,13 +9,7 @@ USERNAME = os.environ["USERNAME"]  # Required
 PASSWORD = os.environ["PASSWORD"]  # Required
 SESSION_DATA = os.environ.get("SESSION_DATA", "")  # First run: Keep empty
 
-# 2. Session Files Cleanup
-def clear_sessions():
-    if os.path.exists("session.json"):
-        os.remove("session.json")
-    print("✅ पुराने Sessions डिलीट किए गए")
-
-# 3. Session Generation Logic
+# 2. Session Generation Logic
 def generate_new_session():
     try:
         client = Client()
@@ -43,9 +36,7 @@ def generate_new_session():
         print(f"❌ Critical Error: {str(e)}")
         return False
 
-# 4. Main Execution
-clear_sessions()
-
+# 3. Main Execution
 if not SESSION_DATA.strip():
     print("🆕 नया Session बनाया जा रहा है...")
     if generate_new_session():
