@@ -7,7 +7,10 @@ import os
 import json
 import time
 import random
+import base64  # यह import जोड़ा गया है
 from datetime import datetime, timedelta
+
+# बाकी कोड वैसा ही रहेगा...
 
 # Monkey patch for thread extraction error
 def patched_extract_direct_thread(data: dict) -> DirectThread:
