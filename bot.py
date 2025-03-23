@@ -7,10 +7,8 @@ import os
 import json
 import time
 import random
-import base64  # यह import जोड़ा गया है
+import base64
 from datetime import datetime, timedelta
-
-# बाकी कोड वैसा ही रहेगा...
 
 # Monkey patch for thread extraction error
 def patched_extract_direct_thread(data: dict) -> DirectThread:
@@ -50,8 +48,8 @@ EXCLUDED_GROUP = "SHANSKARI_BALAK👻💯"
 DM_LINK = "https://ig.me/j/AbadvPz94HkLPUro/"
 TRACKING_FILE = "dm_tracking.json"
 DAILY_DM_LIMIT = 30
-DELAY_RANGE = (600, 1200)  # 10-20 minutes
-BREAK_DURATION = 28800  # 8 hours
+DELAY_RANGE = (600, 1200)
+BREAK_DURATION = 28800
 
 # Environment Variables
 USERNAME = os.environ["USERNAME"]
@@ -125,26 +123,36 @@ def process_groups():
                             print(f"Next DM in {delay//60} minutes...")
                             time.sleep(delay)
 
-# Simplified session handling
+# Fixed session handling
 def handle_session(client):
     try:
         if SESSION_DATA:
-            decoded = json.loads(base64.b64decode(SESSION_DATA))
-            client.load_settings(decoded)
+            # Decode and save to temp file
+            decoded = base64.b64decode(SESSION_DATA)
+            session_dict = json.loads(decoded)
+            
+            with open("temp_session.json", "w") as f:
+                json.dump(session_dict, f)
+            
+            client.load_settings("temp_session.json")
+            os.remove("temp_session.json")
+            
             client.get_timeline_feed()
-            print("✅ Session loaded from ENV!")
+            print("✅ Session loaded successfully!")
             return client
     except Exception as e:
         print(f"⚠️ Session error: {str(e)}")
     
+    # Manual login if session fails
     try:
+        print("Attempting manual login...")
         client.login(USERNAME, PASSWORD)
+        print("✅ Manual login successful!")
         return client
     except Exception as e:
         print(f"❌ Login failed: {str(e)}")
         return None
 
-# Main execution
 if __name__ == "__main__":
     bot = Client()
     authenticated_client = handle_session(bot)
