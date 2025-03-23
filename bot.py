@@ -10,17 +10,32 @@ import random
 import base64
 from datetime import datetime, timedelta
 
-# Monkey patch for thread extraction error
+# Enhanced monkey patch for thread extraction
 def patched_extract_direct_thread(data: dict) -> DirectThread:
+    # Handle None and invalid inviter data
     inviter_data = data.get("inviter") or {}
-    users = [u for u in data.get("users", []) if u is not None]
-    left_users = [u for u in data.get("left_users", []) if u is not None]
+    if inviter_data is None or not isinstance(inviter_data, dict):
+        inviter_data = {}
+
+    # Advanced user data cleaning
+    def clean_users(users):
+        return [u for u in users if isinstance(u, dict) and u.get("pk") or u.get("id")]
+    
+    users = clean_users(data.get("users", []))
+    left_users = clean_users(data.get("left_users", []))
+    
+    # Safe user extraction with fallback
+    def safe_extract(user):
+        try:
+            return extract_user_short(user)
+        except:
+            return None
     
     return DirectThread(
         id=data.get("id"),
         name=data.get("thread_title"),
-        users=[extract_user_short(u) for u in users],
-        left_users=[extract_user_short(u) for u in left_users],
+        users=[u for u in (safe_extract(user) for user in users) if u],
+        left_users=[u for u in (safe_extract(user) for user in left_users) if u],
         admin_user_ids=data.get("admin_user_ids", []),
         items=data.get("items"),
         last_activity_at=data.get("last_activity_at"),
@@ -38,10 +53,12 @@ def patched_extract_direct_thread(data: dict) -> DirectThread:
         oldest_cursor=data.get("oldest_cursor"),
         is_spam=data.get("is_spam"),
         last_seen_at=data.get("last_seen_at"),
-        inviter=extract_user_short(inviter_data) if inviter_data else None,
+        inviter=safe_extract(inviter_data) if inviter_data else None,
     )
 
 instagrapi.extractors.extract_direct_thread = patched_extract_direct_thread
+
+# ... [बाकी कोड वैसा ही रखें जो पिछले संदेश में था] 
 
 # Configuration
 EXCLUDED_GROUP = "SHANSKARI_BALAK👻💯"
@@ -153,6 +170,7 @@ def handle_session(client):
         print(f"❌ Login failed: {str(e)}")
         return None
 
+# Main execution
 if __name__ == "__main__":
     bot = Client()
     authenticated_client = handle_session(bot)
@@ -160,8 +178,13 @@ if __name__ == "__main__":
     if authenticated_client:
         print("🤖 Bot started! Monitoring groups...")
         while True:
-            process_groups()
-            print("Cycling again in 1 hour...")
-            time.sleep(3600)
+            try:
+                process_groups()
+                print("Cycling again in 1 hour...")
+                time.sleep(3600)
+            except Exception as e:
+                print(f"⚠️ Critical error: {str(e)}")
+                print("Restarting bot in 5 minutes...")
+                time.sleep(300)
     else:
         print("❌ Bot failed to start")
