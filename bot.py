@@ -2,6 +2,7 @@ from instagrapi import Client
 from instagrapi.exceptions import ChallengeRequired, LoginRequired, UserNotFound
 from instagrapi.extractors import extract_user_short
 from instagrapi.types import DirectThread
+import instagrapi.extractors
 import os
 import base64
 import json
@@ -11,12 +12,20 @@ from datetime import datetime, timedelta
 
 # Monkey patch for thread extraction error
 def patched_extract_direct_thread(data: dict) -> DirectThread:
-    data["inviter"] = data.get("inviter") or {}
+    # Handle missing inviter and null values
+    inviter_data = data.get("inviter") or {}
+    if not isinstance(inviter_data, dict):
+        inviter_data = {}
+        
+    # Handle null values in users and left_users
+    users = [u for u in data.get("users", []) if u is not None]
+    left_users = [u for u in data.get("left_users", []) if u is not None]
+    
     return DirectThread(
         id=data.get("id"),
         name=data.get("thread_title"),
-        users=[extract_user_short(u) for u in data.get("users", [])],
-        left_users=[extract_user_short(u) for u in data.get("left_users", [])],
+        users=[extract_user_short(u) for u in users],
+        left_users=[extract_user_short(u) for u in left_users],
         admin_user_ids=data.get("admin_user_ids", []),
         items=data.get("items"),
         last_activity_at=data.get("last_activity_at"),
@@ -34,12 +43,14 @@ def patched_extract_direct_thread(data: dict) -> DirectThread:
         oldest_cursor=data.get("oldest_cursor"),
         is_spam=data.get("is_spam"),
         last_seen_at=data.get("last_seen_at"),
-        inviter=extract_user_short(data["inviter"]) if data["inviter"] else None,
+        inviter=extract_user_short(inviter_data) if inviter_data else None,
     )
 
-# Apply the patch
-import instagrapi.extractors
+# Apply patch before any other imports
 instagrapi.extractors.extract_direct_thread = patched_extract_direct_thread
+
+# Rest of your configuration and code...
+# [यहां आपका बाकी कोड वैसा ही रहेगा जो पिछले संदेश में था]
 
 # Configuration
 EXCLUDED_GROUP = "SHANSKARI_BALAK👻💯"
