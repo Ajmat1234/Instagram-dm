@@ -4,67 +4,60 @@ import json
 from instagrapi import Client
 from instagrapi.exceptions import LoginRequired, ChallengeRequired
 
-# 1. Environment Variables (Railway पर सेट करें)
-USERNAME = os.environ["USERNAME"]  # Required
-PASSWORD = os.environ["PASSWORD"]  # Required
-SESSION_DATA = os.environ.get("SESSION_DATA", "")  # First run: Keep empty
+# ENV वेरिएबल्स
+USERNAME = os.environ["USERNAME"]
+PASSWORD = os.environ["PASSWORD"]
+SESSION_DATA = os.environ.get("SESSION_DATA", "")
 
-# 2. Session Generation Logic
-def generate_new_session():
-    try:
-        client = Client()
-        
-        # Login with Credentials
-        client.login(USERNAME, PASSWORD)
-        
-        # Generate Session Data
-        session_data = client.dump_settings()
-        
-        # Convert to Base64
-        json_data = json.dumps(session_data, indent=2)
-        encoded = base64.urlsafe_b64encode(json_data.encode()).decode()
-        
-        # Print for Railway Logs
-        print("\n" + "="*50)
-        print("🚨 COPY BELOW SESSION_DATA AND PASTE IN RAILWAY ENV VARIABLES 🚨")
-        print(encoded)
-        print("="*50 + "\n")
-        
-        return True
-        
-    except Exception as e:
-        print(f"❌ Critical Error: {str(e)}")
-        return False
-
-# 3. Main Execution
-if not SESSION_DATA.strip():
-    print("🆕 नया Session बनाया जा रहा है...")
-    if generate_new_session():
-        print("❗ Railway Dashboard पर जाएं → Environment Variables → SESSION_DATA सेट करें")
-    else:
-        print("❌ Session बनाने में असफल! Instagram ID/Password जाँचें")
-    exit(0)
-
-try:
-    # Initialize Client
+def safe_login():
     client = Client()
     
-    # Decode and Load Session Data
-    decoded = json.loads(base64.b64decode(SESSION_DATA))
-    client.load_settings(decoded)
+    # पहले से मौजूद session_data चेक करें
+    if SESSION_DATA:
+        try:
+            # Base64 डेटा को डिक्शनरी में कन्वर्ट करें
+            decoded_data = base64.b64decode(SESSION_DATA).decode()
+            session_dict = json.loads(decoded_data)
+            
+            # सीधे डिक्शनरी से सेटिंग्स लोड करें
+            client.load_settings(session_dict)
+            
+            # सेशन वैलिडेट करें
+            client.get_timeline_feed()
+            print("✅ पुराने सेशन से लॉगिन सफल!")
+            return client
+            
+        except (LoginRequired, ChallengeRequired, json.JSONDecodeError):
+            print("⚠️ सेशन एक्सपायर, नया लॉगिन कर रहा हूं...")
+
+    # नया लॉगिन अटेम्प्ट
+    try:
+        client.login(USERNAME, PASSWORD)
+        
+        # नया session_data जनरेट करें
+        new_session = client.get_settings()
+        encoded_session = base64.b64encode(
+            json.dumps(new_session).encode()
+        ).decode()
+        
+        print("\n" + "="*50)
+        print("🚨 नया SESSION_DATA कॉपी करें:")
+        print(encoded_session)
+        print("="*50)
+        
+        return client
+        
+    except Exception as e:
+        print(f"❌ गंभीर एरर: {str(e)}")
+        return None
+
+# मुख्य एक्जीक्यूशन
+if __name__ == "__main__":
+    client = safe_login()
     
-    # Force Login Check
-    client.get_timeline_feed()
-    print("✅ Session सफलतापूर्वक लोड हुआ!")
-    
-    # Example: Send DM
-    # user_id = client.user_id_from_username("target_username")
-    # client.direct_send("Hello from instagrapi!", user_ids=[user_id])
-    
-except (LoginRequired, ChallengeRequired) as e:
-    print(f"❌ Session Expired: {str(e)}")
-    print("❗ SESSION_DATA को रीसेट करके फिर से डिप्लॉय करें")
-    exit(1)
-except Exception as e:
-    print(f"❌ अनजान एरर: {str(e)}")
-    exit(1)
+    if client:
+        # यहां अपना मुख्य कोड लिखें
+        print("🤖 बॉट सफलतापूर्वक चालू हुआ!")
+        # उदाहरण: client.direct_send("हैलो!", user_ids=[...])
+    else:
+        print("❌ बॉट स्टार्ट नहीं हो पाया")
