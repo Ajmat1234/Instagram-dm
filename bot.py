@@ -1,9 +1,9 @@
-from instabot import Bot
 import os
 import base64
 import json
 import shutil
-import uuid
+from instagrapi import Client
+from instagrapi.exceptions import LoginRequired, ChallengeRequired
 
 # 1. Environment Variables (Railway पर सेट करें)
 USERNAME = os.environ["USERNAME"]  # Required
@@ -12,31 +12,23 @@ SESSION_DATA = os.environ.get("SESSION_DATA", "")  # First run: Keep empty
 
 # 2. Session Files Cleanup
 def clear_sessions():
-    if os.path.exists("config"):
-        shutil.rmtree("config")
+    if os.path.exists("session.json"):
+        os.remove("session.json")
     print("✅ पुराने Sessions डिलीट किए गए")
 
 # 3. Session Generation Logic
 def generate_new_session():
     try:
-        bot = Bot()
-        if not bot.login(username=USERNAME, password=PASSWORD):
-            raise Exception("Login Failed: Check Credentials")
+        client = Client()
         
-        # Generate New Session Data
-        session = {
-            "uuid": str(uuid.uuid4()),
-            "cookie": bot.api.cookie_jar.get_cookies_dict(),
-            "device_settings": bot.api.device_settings
-        }
+        # Login with Credentials
+        client.login(USERNAME, PASSWORD)
         
-        # Add Required Fields
-        session["cookie"]["ds_user"] = USERNAME
-        session["cookie"]["ds_user_id"] = str(bot.user_id)
-        session["cookie"]["csrftoken"] = bot.api.token
+        # Generate Session Data
+        session_data = client.dump_settings()
         
         # Convert to Base64
-        json_data = json.dumps(session, indent=2)
+        json_data = json.dumps(session_data, indent=2)
         encoded = base64.urlsafe_b64encode(json_data.encode()).decode()
         
         # Print for Railway Logs
@@ -63,21 +55,25 @@ if not SESSION_DATA.strip():
     exit(0)
 
 try:
-    # Decode Session Data
+    # Initialize Client
+    client = Client()
+    
+    # Decode and Load Session Data
     decoded = json.loads(base64.b64decode(SESSION_DATA))
+    client.load_settings(decoded)
     
-    # Manual Session Injection
-    bot = Bot()
-    bot.api.uuid = decoded["uuid"]
-    bot.api.cookie_jar = decoded["cookie"]
-    bot.api.device_settings = decoded["device_settings"]
-    
+    # Force Login Check
+    client.get_timeline_feed()
     print("✅ Session सफलतापूर्वक लोड हुआ!")
     
-    # Your DM Logic Here
-    # bot.send_message(...)
+    # Example: Send DM
+    # user_id = client.user_id_from_username("target_username")
+    # client.direct_send("Hello from instagrapi!", user_ids=[user_id])
     
+except (LoginRequired, ChallengeRequired) as e:
+    print(f"❌ Session Expired: {str(e)}")
+    print("❗ SESSION_DATA को रीसेट करके फिर से डिप्लॉय करें")
+    exit(1)
 except Exception as e:
-    print(f"❌ Session Error: {str(e)}")
-    print("❗ SESSION_DATA गलत है! इसे हटाकर फिर से डिप्लॉय करें")
+    print(f"❌ अनजान एरर: {str(e)}")
     exit(1)
