@@ -1,5 +1,7 @@
 from instagrapi import Client
 from instagrapi.exceptions import ChallengeRequired, LoginRequired, UserNotFound
+from instagrapi.extractors import extract_user_short
+from instagrapi.types import DirectThread
 import os
 import base64
 import json
@@ -7,13 +9,45 @@ import time
 import random
 from datetime import datetime, timedelta
 
+# Monkey patch for thread extraction error
+def patched_extract_direct_thread(data: dict) -> DirectThread:
+    data["inviter"] = data.get("inviter") or {}
+    return DirectThread(
+        id=data.get("id"),
+        name=data.get("thread_title"),
+        users=[extract_user_short(u) for u in data.get("users", [])],
+        left_users=[extract_user_short(u) for u in data.get("left_users", [])],
+        admin_user_ids=data.get("admin_user_ids", []),
+        items=data.get("items"),
+        last_activity_at=data.get("last_activity_at"),
+        muted=data.get("muted"),
+        is_pin=data.get("is_pin"),
+        named=data.get("named"),
+        canonical=data.get("canonical"),
+        pending=data.get("pending"),
+        archived=data.get("archived"),
+        thread_type=data.get("thread_type"),
+        viewer_id=data.get("viewer_id"),
+        thread_has_older=data.get("thread_has_older"),
+        thread_has_newer=data.get("thread_has_newer"),
+        newest_cursor=data.get("newest_cursor"),
+        oldest_cursor=data.get("oldest_cursor"),
+        is_spam=data.get("is_spam"),
+        last_seen_at=data.get("last_seen_at"),
+        inviter=extract_user_short(data["inviter"]) if data["inviter"] else None,
+    )
+
+# Apply the patch
+import instagrapi.extractors
+instagrapi.extractors.extract_direct_thread = patched_extract_direct_thread
+
 # Configuration
-EXCLUDED_GROUP = "SHANSKARI_BALAK👻💯"  # Your group to ignore
+EXCLUDED_GROUP = "SHANSKARI_BALAK👻💯"
 DM_LINK = "https://ig.me/j/AbadvPz94HkLPUro/"
 TRACKING_FILE = "dm_tracking.json"
 DAILY_DM_LIMIT = 30
-DELAY_RANGE = (600, 1200)  # 10-20 minutes in seconds
-BREAK_DURATION = 28800  # 8 hours in seconds
+DELAY_RANGE = (600, 1200)  # 10-20 minutes
+BREAK_DURATION = 28800  # 8 hours
 
 # Environment Variables
 USERNAME = os.environ["USERNAME"]
@@ -25,7 +59,6 @@ def load_tracking():
     try:
         with open(TRACKING_FILE, "r") as f:
             data = json.load(f)
-            # Convert old date format if needed
             if isinstance(data.get('last_reset'), str):
                 data['last_reset'] = datetime.fromisoformat(data['last_reset'])
             return data
@@ -44,10 +77,7 @@ def reset_daily_counter(data):
     return data
 
 def is_user_eligible(user_id, data):
-    return (
-        user_id not in data['sent_users'] and
-        data['daily_count'] < DAILY_DM_LIMIT
-    )
+    return user_id not in data['sent_users'] and data['daily_count'] < DAILY_DM_LIMIT
 
 # Bot functions
 def is_private_user(user_id):
@@ -55,7 +85,7 @@ def is_private_user(user_id):
         user = bot.user_info(user_id)
         return user.is_private
     except UserNotFound:
-        return True  # Skip if user not found
+        return True
     except Exception:
         return False
 
@@ -87,28 +117,23 @@ def process_groups():
                             tracking_data['sent_users'].append(msg.user_id)
                             tracking_data['daily_count'] += 1
                             save_tracking(tracking_data)
-                            
                             delay = random.randint(*DELAY_RANGE)
                             print(f"Next DM in {delay//60} minutes...")
                             time.sleep(delay)
 
-# Session handling (same as before)
+# Session handling
 def handle_session(client):
     try:
         if SESSION_DATA:
             decoded = base64.b64decode(SESSION_DATA)
             session_dict = json.loads(decoded)
-            
             with open("temp_session.json", "w") as f:
                 json.dump(session_dict, f)
-            
             client.load_settings("temp_session.json")
             os.remove("temp_session.json")
-            
             client.get_timeline_feed()
             print("✅ Session loaded!")
             return client
-            
     except (LoginRequired, ChallengeRequired, Exception) as e:
         print(f"⚠️ Session error: {str(e)}")
 
@@ -121,7 +146,6 @@ def handle_session(client):
         print(encoded)
         print("="*50)
         return client
-        
     except Exception as e:
         print(f"❌ Login failed: {str(e)}")
         return None
@@ -136,6 +160,6 @@ if __name__ == "__main__":
         while True:
             process_groups()
             print("Cycling again in 1 hour...")
-            time.sleep(3600)  # Check every hour
+            time.sleep(3600)
     else:
         print("❌ Bot failed to start")
