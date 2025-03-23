@@ -12,24 +12,15 @@ from datetime import datetime, timedelta
 
 # Enhanced monkey patch for thread extraction
 def patched_extract_direct_thread(data: dict) -> DirectThread:
-    # Handle None and invalid inviter data
-    inviter_data = data.get("inviter") or {}
-    if inviter_data is None or not isinstance(inviter_data, dict):
-        inviter_data = {}
-
-    # Advanced user data cleaning
-    def clean_users(users):
-        return [u for u in users if isinstance(u, dict) and u.get("pk") or u.get("id")]
-    
-    users = clean_users(data.get("users", []))
-    left_users = clean_users(data.get("left_users", []))
-    
-    # Safe user extraction with fallback
     def safe_extract(user):
         try:
-            return extract_user_short(user)
+            return extract_user_short(user) if isinstance(user, dict) else None
         except:
             return None
+
+    inviter_data = data.get("inviter") or {}
+    users = [u for u in data.get("users", []) if isinstance(u, dict)]
+    left_users = [u for u in data.get("left_users", []) if isinstance(u, dict)]
     
     return DirectThread(
         id=data.get("id"),
@@ -53,20 +44,18 @@ def patched_extract_direct_thread(data: dict) -> DirectThread:
         oldest_cursor=data.get("oldest_cursor"),
         is_spam=data.get("is_spam"),
         last_seen_at=data.get("last_seen_at"),
-        inviter=safe_extract(inviter_data) if inviter_data else None,
+        inviter=safe_extract(inviter_data),
     )
 
 instagrapi.extractors.extract_direct_thread = patched_extract_direct_thread
-
-# ... [बाकी कोड वैसा ही रखें जो पिछले संदेश में था] 
 
 # Configuration
 EXCLUDED_GROUP = "SHANSKARI_BALAK👻💯"
 DM_LINK = "https://ig.me/j/AbadvPz94HkLPUro/"
 TRACKING_FILE = "dm_tracking.json"
 DAILY_DM_LIMIT = 30
-DELAY_RANGE = (600, 1200)
-BREAK_DURATION = 28800
+DELAY_RANGE = (600, 1200)  # 10-20 minutes
+BREAK_DURATION = 28800  # 8 hours
 
 # Environment Variables
 USERNAME = os.environ["USERNAME"]
@@ -78,10 +67,9 @@ def load_tracking():
     try:
         with open(TRACKING_FILE, "r") as f:
             data = json.load(f)
-            if isinstance(data.get('last_reset'), str):
-                data['last_reset'] = datetime.fromisoformat(data['last_reset'])
+            data['last_reset'] = datetime.fromisoformat(data['last_reset']) if isinstance(data.get('last_reset'), str) else datetime.now()
             return data
-    except (FileNotFoundError, json.JSONDecodeError):
+    except:
         return {'sent_users': [], 'daily_count': 0, 'last_reset': datetime.now()}
 
 def save_tracking(data):
@@ -101,12 +89,9 @@ def is_user_eligible(user_id, data):
 # Bot functions
 def is_private_user(user_id):
     try:
-        user = bot.user_info(user_id)
-        return user.is_private
-    except UserNotFound:
+        return bot.user_info(user_id).is_private
+    except:
         return True
-    except Exception:
-        return False
 
 def send_dm(user_id):
     try:
@@ -117,54 +102,50 @@ def send_dm(user_id):
         return False
 
 def process_groups():
-    tracking_data = load_tracking()
-    tracking_data = reset_daily_counter(tracking_data)
+    tracking_data = reset_daily_counter(load_tracking())
     
-    threads = bot.direct_threads()
-    for thread in threads:
-        if thread.is_group and thread.title != EXCLUDED_GROUP:
-            messages = bot.direct_messages(thread_id=thread.id, amount=20)
+    try:
+        threads = bot.direct_threads()
+        for thread in threads:
+            if not thread.is_group or thread.title == EXCLUDED_GROUP:
+                continue
+                
+            messages = bot.direct_messages(thread_id=thread.id, amount=5)  # Reduced to 5 messages
             for msg in messages:
                 if tracking_data['daily_count'] >= DAILY_DM_LIMIT:
                     print("Daily limit reached! Taking 8 hour break...")
                     time.sleep(BREAK_DURATION)
                     tracking_data = reset_daily_counter(load_tracking())
+                    break  # Exit message loop
                     
-                if msg.user_id != bot.user_id and is_user_eligible(msg.user_id, tracking_data):
-                    if not is_private_user(msg.user_id):
-                        if send_dm(msg.user_id):
-                            tracking_data['sent_users'].append(msg.user_id)
-                            tracking_data['daily_count'] += 1
-                            save_tracking(tracking_data)
-                            delay = random.randint(*DELAY_RANGE)
-                            print(f"Next DM in {delay//60} minutes...")
-                            time.sleep(delay)
+                if msg.user_id == bot.user_id:
+                    continue
+                    
+                if is_user_eligible(msg.user_id, tracking_data) and not is_private_user(msg.user_id):
+                    if send_dm(msg.user_id):
+                        tracking_data['sent_users'].append(msg.user_id)
+                        tracking_data['daily_count'] += 1
+                        save_tracking(tracking_data)
+                        delay = random.randint(*DELAY_RANGE)
+                        print(f"Next DM in {delay//60} minutes...")
+                        time.sleep(delay)
+    except Exception as e:
+        print(f"Group processing error: {str(e)}")
 
-# Fixed session handling
+# Session handling
 def handle_session(client):
     try:
         if SESSION_DATA:
-            # Decode and save to temp file
-            decoded = base64.b64decode(SESSION_DATA)
-            session_dict = json.loads(decoded)
-            
-            with open("temp_session.json", "w") as f:
-                json.dump(session_dict, f)
-            
-            client.load_settings("temp_session.json")
-            os.remove("temp_session.json")
-            
-            client.get_timeline_feed()
-            print("✅ Session loaded successfully!")
+            session_dict = json.loads(base64.b64decode(SESSION_DATA))
+            client.load_settings(session_dict)  # Directly load from dict
+            client.get_timeline_feed()  # Verify session
+            print("✅ Session loaded from ENV!")
             return client
     except Exception as e:
         print(f"⚠️ Session error: {str(e)}")
     
-    # Manual login if session fails
     try:
-        print("Attempting manual login...")
         client.login(USERNAME, PASSWORD)
-        print("✅ Manual login successful!")
         return client
     except Exception as e:
         print(f"❌ Login failed: {str(e)}")
@@ -173,18 +154,18 @@ def handle_session(client):
 # Main execution
 if __name__ == "__main__":
     bot = Client()
-    authenticated_client = handle_session(bot)
+    bot.handle_session = handle_session(bot)
     
-    if authenticated_client:
+    if bot.handle_session:
         print("🤖 Bot started! Monitoring groups...")
         while True:
             try:
                 process_groups()
-                print("Cycling again in 1 hour...")
-                time.sleep(3600)
+                print("Next check in 30 minutes...")
+                time.sleep(1800)  # 30 minutes cycle
             except Exception as e:
-                print(f"⚠️ Critical error: {str(e)}")
-                print("Restarting bot in 5 minutes...")
+                print(f"Critical error: {str(e)}")
+                print("Restarting in 5 minutes...")
                 time.sleep(300)
     else:
         print("❌ Bot failed to start")
