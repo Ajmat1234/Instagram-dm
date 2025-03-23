@@ -1,82 +1,68 @@
 from instagrapi import Client
-from instagrapi.exceptions import ChallengeRequired
-import json
+from instagrapi.exceptions import ChallengeRequired, LoginRequired
 import os
 import base64
+import json
 
+# Environment Variables
+USERNAME = os.environ["USERNAME"]
+PASSWORD = os.environ["PASSWORD"]
+SESSION_DATA = os.environ.get("SESSION_DATA", "")
 
-
-# Environment Variables (Set this in your environment or Railway.com)
-USERNAME = os.getenv("USERNAME")
-PASSWORD = os.getenv("PASSWORD")
-SESSION_DATA = os.getenv("SESSION_DATA")
-
-# User tracking system
-def load_users():
+def handle_session(client):
+    """Secure session management with auto-renewal"""
     try:
-        with open(TRACKING_FILE, "r") as f:
-            return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        return {}
+        if SESSION_DATA:
+            # Decode base64 to session dictionary
+            decoded = base64.b64decode(SESSION_DATA)
+            session_dict = json.loads(decoded)
+            
+            # Temporary file for loading session
+            with open("temp_session.json", "w") as f:
+                json.dump(session_dict, f)
+            
+            client.load_settings("temp_session.json")
+            os.remove("temp_session.json")
+            
+            # Validate session
+            client.get_timeline_feed()
+            print("✅ Existing session loaded successfully!")
+            return client
+            
+    except (LoginRequired, ChallengeRequired, Exception) as e:
+        print(f"⚠️ Session error: {str(e)}")
 
-def save_user(user_id, last_mentioned):
-    users = load_users()
-    users[user_id] = last_mentioned.isoformat()  # Save time as string format
-    with open(TRACKING_FILE, "w") as f:
-        json.dump(users, f)
-
-def should_welcome(user_id):
-    users = load_users()
-    if user_id not in users:
-        return True
-    last_mentioned = datetime.fromisoformat(users[user_id])
-    return datetime.now() - last_mentioned > timedelta(hours=12)  # 12 hours gap
-
-# Load session file from environment variable
-def load_session_from_env():
-    if SESSION_DATA:
-        try:
-            decoded_data = base64.b64decode(SESSION_DATA)
-            with open("ig_session.json", "wb") as f:
-                f.write(decoded_data)
-            print("📝 Session file decoded aur save ho gaya.")
-            return True
-        except Exception as e:
-            print(f"❌ SESSION_DATA decode nahi ho saka: {e}")
-            return False
-    return False
-
-# Authentication code handler
-def handle_challenge():
-    challenge_url = bot.last_json.get("challenge", {}).get("api_path")
-    if challenge_url:
-        print(f"🔒 Challenge URL: {challenge_url}")
-        code = input("Enter code here: ")  # Replace with actual code entry mechanism
-        bot.challenge_resolve(challenge_url, code)
-        print("✅ Challenge resolved, re-logging in...")
-        bot.login(USERNAME, PASSWORD)
-        bot.dump_settings("ig_session.json")
-
-# Start bot function
-def start_bot():
-    global bot
-    bot = Client()
-
-    if load_session_from_env():  
-        try:
-            bot.load_settings("ig_session.json")
-            print("✅ Logged in using session!")
-        except:
-            print("❌ Session load fail, manual login kar raha hoon...")
-            bot.login(USERNAME, PASSWORD)
-            bot.dump_settings("ig_session.json")  
-    else:
-        print("❌ Session nahi mila, manually login kar rahe hain...")
-        bot.login(USERNAME, PASSWORD)
-        bot.dump_settings("ig_session.json")  
-
-    print(f"🚀 Bot started: {datetime.now().strftime('%d-%m-%Y %H:%M')}")
-    forever_bot()
+    # New login attempt
+    try:
+        client.login(USERNAME, PASSWORD)
+        
+        # Generate and print new session
+        new_session = client.get_settings()
+        encoded = base64.b64encode(
+            json.dumps(new_session).encode()
+        ).decode()
+        
+        print("\n" + "="*50)
+        print("🚨 NEW SESSION_DATA (Copy this to ENV):")
+        print(encoded)
+        print("="*50)
+        
+        return client
+        
+    except Exception as e:
+        print(f"❌ Login failed: {str(e)}")
+        return None
 
 if __name__ == "__main__":
-    start_bot()
+    # Initialize client
+    bot = Client()
+    
+    # Authentication flow
+    authenticated_client = handle_session(bot)
+    
+    if authenticated_client:
+        print("🤖 Authentication successful! Add your functions here")
+        # Add your custom functions after this line
+        
+    else:
+        print("❌ Bot failed to start")
