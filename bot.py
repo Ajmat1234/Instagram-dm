@@ -4,7 +4,6 @@ from instagrapi.extractors import extract_user_short
 from instagrapi.types import DirectThread
 import instagrapi.extractors
 import os
-import base64
 import json
 import time
 import random
@@ -12,12 +11,7 @@ from datetime import datetime, timedelta
 
 # Monkey patch for thread extraction error
 def patched_extract_direct_thread(data: dict) -> DirectThread:
-    # Handle missing inviter and null values
     inviter_data = data.get("inviter") or {}
-    if not isinstance(inviter_data, dict):
-        inviter_data = {}
-        
-    # Handle null values in users and left_users
     users = [u for u in data.get("users", []) if u is not None]
     left_users = [u for u in data.get("left_users", []) if u is not None]
     
@@ -46,11 +40,7 @@ def patched_extract_direct_thread(data: dict) -> DirectThread:
         inviter=extract_user_short(inviter_data) if inviter_data else None,
     )
 
-# Apply patch before any other imports
 instagrapi.extractors.extract_direct_thread = patched_extract_direct_thread
-
-# Rest of your configuration and code...
-# [यहां आपका बाकी कोड वैसा ही रहेगा जो पिछले संदेश में था]
 
 # Configuration
 EXCLUDED_GROUP = "SHANSKARI_BALAK👻💯"
@@ -132,30 +122,20 @@ def process_groups():
                             print(f"Next DM in {delay//60} minutes...")
                             time.sleep(delay)
 
-# Session handling
+# Simplified session handling
 def handle_session(client):
     try:
         if SESSION_DATA:
-            decoded = base64.b64decode(SESSION_DATA)
-            session_dict = json.loads(decoded)
-            with open("temp_session.json", "w") as f:
-                json.dump(session_dict, f)
-            client.load_settings("temp_session.json")
-            os.remove("temp_session.json")
+            decoded = json.loads(base64.b64decode(SESSION_DATA))
+            client.load_settings(decoded)
             client.get_timeline_feed()
-            print("✅ Session loaded!")
+            print("✅ Session loaded from ENV!")
             return client
-    except (LoginRequired, ChallengeRequired, Exception) as e:
+    except Exception as e:
         print(f"⚠️ Session error: {str(e)}")
-
+    
     try:
         client.login(USERNAME, PASSWORD)
-        new_session = client.get_settings()
-        encoded = base64.b64encode(json.dumps(new_session).encode()).decode()
-        print("\n" + "="*50)
-        print("🚨 NEW SESSION_DATA:")
-        print(encoded)
-        print("="*50)
         return client
     except Exception as e:
         print(f"❌ Login failed: {str(e)}")
