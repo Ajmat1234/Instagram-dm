@@ -20,8 +20,6 @@ logger = logging.getLogger(__name__)
 L = instaloader.Instaloader(
     max_connection_attempts=3,
     request_timeout=60,
-    sleep=True,
-    sleep_time=300,  # 5 minutes between batches
     user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
 )
 
