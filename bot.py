@@ -60,7 +60,7 @@ BREAK_DURATION = 28800  # 8 hours
 # Environment Variables with fallback
 USERNAME = os.environ.get("USERNAME", "tumhara_username")  # Apna username yahan daalo
 PASSWORD = os.environ.get("PASSWORD", "tumhara_password")  # Apna password yahan daalo
-SESSION_DATA = os.environ.get("SESSION_DATA", "")  # Agar session data hai toh daalo, nahi toh khali chhodo
+SESSION_DATA = os.environ.get("SESSION_DATA", "ewogICAgInV1aWRzIjogewogICAgICAgICJwaG9uZV9pZCI6ICI0Y2M5MDgyZS1lOTc3LTQzYTItYWJjZS0zMjFmODYxODE4MmQiLAogICAgICAgICJ1dWlkIjogIjAwMjY2YTk1LWYzZTctNGZiMS1hODU3LTllMzk2YzgyODBmYiIsCiAgICAgICAgImNsaWVudF9zZXNzaW9uX2lkIjogImZkNTdkOTlmLTdiNmUtNDY2MC1hNTFmLTU0MDg2MDY4ZTEwYSIsCiAgICAgICAgImFkdmVydGlzaW5nX2lkIjogImJjOGMzMzgyLThiNmEtNGVjYS05YjU5LTczODViNTc4Yzc5MyIsCiAgICAgICAgImFuZHJvaWRfZGV2aWNlX2lkIjogImFuZHJvaWQtYmQzYzJhM2YwMDFjYmMzMSIsCiAgICAgICAgInJlcXVlc3RfaWQiOiAiNWVmNWFmYTItZThhMC00N2JjLTlkNGEtMDAwMzA2YWJjMDM3IiwKICAgICAgICAidHJheV9zZXNzaW9uX2lkIjogIjQ4OWVlNjRhLTRhZWEtNDhkMC1hZDE1LTZkYmQxMmMzZGU4ZCIKICAgIH0sCiAgICAibWlkIjogIlotQlJhQUFCQUFFOUc5TTZEcXlWZGNNU0E0QVciLAogICAgImlnX3VfcnVyIjogbnVsbCwKICAgICJpZ193d3dfY2xhaW0iOiBudWxsLAogICAgImF1dGhvcml6YXRpb25fZGF0YSI6IHsKICAgICAgICAiZHNfdXNlcl9pZCI6ICI1NzI1NzM3NzA2MyIsCiAgICAgICAgInNlc3Npb25pZCI6ICI1NzI1NzM3NzA2MyUzQTVoTHk0MWxhMnZsQVZsJTNBMTclM0FBWWVBV2tjSjAwOWZDQXRhT2hySW9IVEJEamNDR3BMVHRhaXQ5ZHVqQmciCiAgICB9LAogICAgImNvb2tpZXMiOiB7fSwKICAgICJsYXN0X2xvZ2luIjogMTc0Mjc1NDE2MS45NTQ3NTU4LAogICAgImRldmljZV9zZXR0aW5ncyI6IHsKICAgICAgICAiYXBwX3ZlcnNpb24iOiAiMzEyLjAuMC4yNS4xMTkiLAogICAgICAgICJhbmRyb2lkX3ZlcnNpb24iOiAzNCwKICAgICAgICAiYW5kcm9pZF9yZWxlYXNlIjogIjE0LjAuMCIsCiAgICAgICAgImRwaSI6ICI0ODBkcGkiLAogICAgICAgICJyZXNvbHV0aW9uIjogIjEwODB4MjQwMCIsCiAgICAgICAgIm1hbnVmYWN0dXJlciI6ICJzYW1zdW5nIiwKICAgICAgICAiZGV2aWNlIjogIlNNLVM5MThCIiwKICAgICAgICAibW9kZWwiOiAiR2FsYXh5IFMyMyBVbHRyYSIKICAgIH0sCiAgICAidXNlcl9hZ2VudCI6ICJJbnN0YWdyYW0gMjY5LjAuMC4xOC43NSBBbmRyb2lkICgyNi84LjAuMDsgNDgwZHBpOyAxMDgweDE5MjA7IE9uZVBsdXM7IDZUIERldjsgZGV2aXRyb247IHFjb207IGVuX1VTOyAzMTQ2NjUyNTYpIiwKICAgICJjb3VudHJ5IjogIlVTIiwKICAgICJjb3VudHJ5X2NvZGUiOiAxLAogICAgImxvY2FsZSI6ICJlbl9VUyIsCiAgICAidGltZXpvbmVfb2Zmc2V0IjogLTE0NDAwCn0=")  # Tumhara base64 session data
 
 # Tracking system
 def load_tracking():
@@ -136,9 +136,11 @@ def process_groups(bot):
 def handle_session(client):
     try:
         if SESSION_DATA:
+            # Base64 decode karke JSON string banao, phir dictionary mein convert karo
             session_json = base64.b64decode(SESSION_DATA).decode('utf-8')
-            client.load_settings(session_json)
-            client.get_timeline_feed()
+            session_dict = json.loads(session_json)
+            client.set_settings(session_dict)  # Dictionary ko set karo
+            client.get_timeline_feed()  # Session verify karo
             print("✅ Session loaded from ENV!")
             return client
     except Exception as e:
