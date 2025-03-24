@@ -1,4 +1,1 @@
-instagrapi
-requests
-Pillow>=10.0.0  # या कोई नया वर्जन
-moviepy>=1.0.3
+instaloader==4.10.3
