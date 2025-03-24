@@ -1,57 +1,11 @@
 from instagrapi import Client
 from instagrapi.exceptions import ChallengeRequired, LoginRequired, UserNotFound
-from instagrapi.extractors import extract_user_short
-from instagrapi.types import DirectThread
-import instagrapi.extractors
 import os
 import json
 import time
 import random
 import base64
 from datetime import datetime, timedelta
-
-# Enhanced monkey patch for thread extraction with None check
-def patched_extract_direct_thread(data: dict) -> DirectThread:
-    if not data or not isinstance(data, dict):
-        print("⚠️ Thread data is None or invalid!")
-        return None
-
-    def safe_extract(user):
-        try:
-            return extract_user_short(user) if isinstance(user, dict) else None
-        except:
-            return None
-
-    inviter_data = data.get("inviter") or {}
-    users = [u for u in data.get("users", []) if isinstance(u, dict)]
-    left_users = [u for u in data.get("left_users", []) if isinstance(u, dict)]
-    
-    return DirectThread(
-        id=data.get("id"),
-        name=data.get("thread_title"),
-        users=[u for u in (safe_extract(user) for user in users) if u],
-        left_users=[u for u in (safe_extract(user) for user in left_users) if u],
-        admin_user_ids=data.get("admin_user_ids", []),
-        items=data.get("items"),
-        last_activity_at=data.get("last_activity_at"),
-        muted=data.get("muted"),
-        is_pin=data.get("is_pin"),
-        named=data.get("named"),
-        canonical=data.get("canonical"),
-        pending=data.get("pending"),
-        archived=data.get("archived"),
-        thread_type=data.get("thread_type"),
-        viewer_id=data.get("viewer_id"),
-        thread_has_older=data.get("thread_has_older"),
-        thread_has_newer=data.get("thread_has_newer"),
-        newest_cursor=data.get("newest_cursor"),
-        oldest_cursor=data.get("oldest_cursor"),
-        is_spam=data.get("is_spam"),
-        last_seen_at=data.get("last_seen_at"),
-        inviter=safe_extract(inviter_data),
-    )
-
-instagrapi.extractors.extract_direct_thread = patched_extract_direct_thread
 
 # Configuration
 EXCLUDED_GROUP = "SHANSKARI_BALAK👻💯"
@@ -113,21 +67,24 @@ def process_groups(bot):
         try:
             print(f"\n🌀 {datetime.now().strftime('%H:%M:%S')} - scanning...")
             threads = bot.direct_threads(amount=10)  # Check only 10 latest threads
-            if not threads:
-                print("⚠️ No threads found!")
-                break
+            if threads is None:
+                print("⚠️ No threads received from Instagram! Session might be expired.")
+                return False  # Trigger session refresh
 
             for thread in threads:
-                if not thread or not thread.is_group or thread.title == EXCLUDED_GROUP:
+                if thread is None:
+                    print("⚠️ Skipping invalid thread!")
+                    continue
+                if not getattr(thread, 'is_group', False) or getattr(thread, 'title', '') == EXCLUDED_GROUP:
                     continue
 
-                messages = bot.direct_messages(thread_id=thread.id, amount=5)  # Check 5 latest messages
-                if not messages:
-                    print(f"⚠️ No messages in thread {thread.id}!")
+                messages = bot.direct_messages(thread_id=thread.id, amount=5)
+                if messages is None:
+                    print(f"⚠️ No messages received for thread {thread.id}!")
                     continue
 
                 for msg in messages:
-                    if not msg or msg.user_id == bot.user_id:
+                    if msg is None or getattr(msg, 'user_id', None) == bot.user_id:
                         continue
 
                     if tracking_data['daily_count'] >= DAILY_DM_LIMIT:
@@ -136,13 +93,14 @@ def process_groups(bot):
                         tracking_data = reset_daily_counter(load_tracking())
                         break
 
-                    if is_user_eligible(msg.user_id, tracking_data) and not is_private_user(bot, msg.user_id):
-                        if send_dm(bot, msg.user_id):
-                            tracking_data['sent_users'].append(msg.user_id)
+                    user_id = getattr(msg, 'user_id', None)
+                    if user_id and is_user_eligible(user_id, tracking_data) and not is_private_user(bot, user_id):
+                        if send_dm(bot, user_id):
+                            tracking_data['sent_users'].append(user_id)
                             tracking_data['daily_count'] += 1
                             save_tracking(tracking_data)
                             delay = random.randint(*DELAY_RANGE)
-                            print(f"✅ DM sent to user {msg.user_id}! Next DM in {delay//60} minutes...")
+                            print(f"✅ DM sent to user {user_id}! Next DM in {delay//60} minutes...")
                             time.sleep(delay)
 
             break  # Exit inner loop after one scan
@@ -150,24 +108,25 @@ def process_groups(bot):
         except ChallengeRequired:
             print("🔒 Challenge detected, restarting in 5 minutes...")
             time.sleep(300)
-            return
+            return False
         except Exception as e:
             print(f"⚠️ Error: {str(e)}")
             time.sleep(300)
-            return
+            return False
 
-# Session handling
-def handle_session(client):
-    try:
-        if SESSION_DATA:
-            session_json = base64.b64decode(SESSION_DATA).decode('utf-8')
-            session_dict = json.loads(session_json)
-            client.set_settings(session_dict)
-            client.get_timeline_feed()
-            print("✅ Session loaded from ENV!")
-            return client
-    except Exception as e:
-        print(f"⚠️ Session error: {str(e)}")
+# Session handling with refresh option
+def handle_session(client, force_login=False):
+    if not force_login:
+        try:
+            if SESSION_DATA:
+                session_json = base64.b64decode(SESSION_DATA).decode('utf-8')
+                session_dict = json.loads(session_json)
+                client.set_settings(session_dict)
+                client.get_timeline_feed()
+                print("✅ Session loaded from ENV!")
+                return client
+        except Exception as e:
+            print(f"⚠️ Session error: {str(e)}")
     
     try:
         client.login(USERNAME, PASSWORD)
@@ -185,7 +144,12 @@ if __name__ == "__main__":
     if bot_instance:
         print("🤖 Bot started! Monitoring groups...")
         while True:
-            process_groups(bot_instance)
+            if not process_groups(bot_instance):
+                print("⚠️ Session issue detected, attempting to refresh...")
+                bot_instance = handle_session(bot, force_login=True)
+                if not bot_instance:
+                    print("❌ Bot failed to restart, exiting...")
+                    break
             print("Next check in 30 minutes...")
             time.sleep(CHECK_INTERVAL)
     else:
