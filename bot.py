@@ -10,8 +10,12 @@ import random
 import base64
 from datetime import datetime, timedelta
 
-# Enhanced monkey patch for thread extraction
+# Enhanced monkey patch for thread extraction with None check
 def patched_extract_direct_thread(data: dict) -> DirectThread:
+    if not data or not isinstance(data, dict):  # Agar data None ya dict nahi hai
+        print("⚠️ Thread data is None or invalid!")
+        return None
+
     def safe_extract(user):
         try:
             return extract_user_short(user) if isinstance(user, dict) else None
@@ -60,7 +64,7 @@ BREAK_DURATION = 28800  # 8 hours
 # Environment Variables with fallback
 USERNAME = os.environ.get("USERNAME", "tumhara_username")  # Apna username yahan daalo
 PASSWORD = os.environ.get("PASSWORD", "tumhara_password")  # Apna password yahan daalo
-SESSION_DATA = os.environ.get("SESSION_DATA", "ewogICAgInV1aWRzIjogewogICAgICAgICJwaG9uZV9pZCI6ICI0Y2M5MDgyZS1lOTc3LTQzYTItYWJjZS0zMjFmODYxODE4MmQiLAogICAgICAgICJ1dWlkIjogIjAwMjY2YTk1LWYzZTctNGZiMS1hODU3LTllMzk2YzgyODBmYiIsCiAgICAgICAgImNsaWVudF9zZXNzaW9uX2lkIjogImZkNTdkOTlmLTdiNmUtNDY2MC1hNTFmLTU0MDg2MDY4ZTEwYSIsCiAgICAgICAgImFkdmVydGlzaW5nX2lkIjogImJjOGMzMzgyLThiNmEtNGVjYS05YjU5LTczODViNTc4Yzc5MyIsCiAgICAgICAgImFuZHJvaWRfZGV2aWNlX2lkIjogImFuZHJvaWQtYmQzYzJhM2YwMDFjYmMzMSIsCiAgICAgICAgInJlcXVlc3RfaWQiOiAiNWVmNWFmYTItZThhMC00N2JjLTlkNGEtMDAwMzA2YWJjMDM3IiwKICAgICAgICAidHJheV9zZXNzaW9uX2lkIjogIjQ4OWVlNjRhLTRhZWEtNDhkMC1hZDE1LTZkYmQxMmMzZGU4ZCIKICAgIH0sCiAgICAibWlkIjogIlotQlJhQUFCQUFFOUc5TTZEcXlWZGNNU0E0QVciLAogICAgImlnX3VfcnVyIjogbnVsbCwKICAgICJpZ193d3dfY2xhaW0iOiBudWxsLAogICAgImF1dGhvcml6YXRpb25fZGF0YSI6IHsKICAgICAgICAiZHNfdXNlcl9pZCI6ICI1NzI1NzM3NzA2MyIsCiAgICAgICAgInNlc3Npb25pZCI6ICI1NzI1NzM3NzA2MyUzQTVoTHk0MWxhMnZsQVZsJTNBMTclM0FBWWVBV2tjSjAwOWZDQXRhT2hySW9IVEJEamNDR3BMVHRhaXQ5ZHVqQmciCiAgICB9LAogICAgImNvb2tpZXMiOiB7fSwKICAgICJsYXN0X2xvZ2luIjogMTc0Mjc1NDE2MS45NTQ3NTU4LAogICAgImRldmljZV9zZXR0aW5ncyI6IHsKICAgICAgICAiYXBwX3ZlcnNpb24iOiAiMzEyLjAuMC4yNS4xMTkiLAogICAgICAgICJhbmRyb2lkX3ZlcnNpb24iOiAzNCwKICAgICAgICAiYW5kcm9pZF9yZWxlYXNlIjogIjE0LjAuMCIsCiAgICAgICAgImRwaSI6ICI0ODBkcGkiLAogICAgICAgICJyZXNvbHV0aW9uIjogIjEwODB4MjQwMCIsCiAgICAgICAgIm1hbnVmYWN0dXJlciI6ICJzYW1zdW5nIiwKICAgICAgICAiZGV2aWNlIjogIlNNLVM5MThCIiwKICAgICAgICAibW9kZWwiOiAiR2FsYXh5IFMyMyBVbHRyYSIKICAgIH0sCiAgICAidXNlcl9hZ2VudCI6ICJJbnN0YWdyYW0gMjY5LjAuMC4xOC43NSBBbmRyb2lkICgyNi84LjAuMDsgNDgwZHBpOyAxMDgweDE5MjA7IE9uZVBsdXM7IDZUIERldjsgZGV2aXRyb247IHFjb207IGVuX1VTOyAzMTQ2NjUyNTYpIiwKICAgICJjb3VudHJ5IjogIlVTIiwKICAgICJjb3VudHJ5X2NvZGUiOiAxLAogICAgImxvY2FsZSI6ICJlbl9VUyIsCiAgICAidGltZXpvbmVfb2Zmc2V0IjogLTE0NDAwCn0=")  # Tumhara base64 session data
+SESSION_DATA = os.environ.get("SESSION_DATA", "eyJ1dWlkcyI6eyJwaG9uZV9pZCI6IjRjYzkwODJlLWU5NzctNDNhMi1hYmNlLTMyMWY4NjE4MTgyZCIsInV1aWQiOiIwMDI2NmE5NS1mM2U3LTRmYjEtYTg1Ny05ZTM5NmM4MjgwZmIiLCJjbGllbnRfc2Vzc2lvbl9pZCI6ImZkNTdkOTlmLTdiNmUtNDY2MC1hNTFmLTU0MDg2MDY4ZTEwYSIsImFkdmVydGlzaW5nX2lkIjoiYmM4YzMzODItOGI2YS00ZWNhLTliNTktNzM4NWI1NzhjNzkzIiwiYW5kcm9pZF9kZXZpY2VfaWQiOiJhbmRyb2lkLWJkM2MyYTNmMDAxY2JjMzEiLCJyZXF1ZXN0X2lkIjoiNWVmNWFmYTItZThhMC00N2JjLTlkNGEtMDAwMzA2YWJjMDM3IiwidHJheV9zZXNzaW9uX2lkIjoiNDg5ZWU2NGEtNGFlYS00OGQwLWFkMTUtNmRiZDEyYzNkZThkIn0sIm1pZCI6IlotQlJhQUFCQUFFOUc5TTZEcXlWZGNNU0E0QVciLCJpZ191X3J1ciI6bnVsbCwiaWdfd3d3X2NsYWltIjpudWxsLCJhdXRob3JpemF0aW9uX2RhdGEiOnsiZHNfdXNlcl9pZCI6IjU3MjU3Mzc3MDYzIiwic2Vzc2lvbmlkIjoiNTcyNTczNzcwNjMlM0E1aEx5NDFsYTJ2bEFWbCUzQTE3JTNBQVllQVdrY0owMDlmQ0F0YU9ocklvSFRCRGpjQ0dwTFR0YWl0OWR1akJnIn0sImNvb2tpZXMiOnt9LCJsYXN0X2xvZ2luIjoxNzQyNzU0MTYxLjk1NDc1NTgsImRldmljZV9zZXR0aW5ncyI6eyJhcHBfdmVyc2lvbiI6IjMxMi4wLjAuMjUuMTE5IiwiYW5kcm9pZF92ZXJzaW9uIjozNCwiYW5kcm9pZF9yZWxlYXNlIjoiMTQuMC4wIiwiZHBpIjoiNDgwZHBpIiwicmVzb2x1dGlvbiI6IjEwODB4MjQwMCIsIm1hbnVmYWN0dXJlciI6InNhbXN1bmciLCJkZXZpY2UiOiJTTVM5MThCIiwibW9kZWwiOiJHYWxheHkgUzIzIFVsdHJhIn0sInVzZXJfYWdlbnQiOiJJbnN0YWdyYW0gMjY5LjAuMC4xOC43NSBBbmRyb2lkICgyNi84LjAuMDsgNDgwZHBpOyAxMDgweDE5MjA7IE9uZVBsdXM7IDZUIERldjsgZGV2aXRyb247IHFjb207IGVuX1VTOzMxNDY2NTI1NikiLCJjb3VudHJ5IjoiVVMiLCJjb3VudHJ5X2NvZGUiOjEsImxvY2FsZSI6ImVuX1VTIiwidGltZXpvbmVfb2Zmc2V0IjotMTQ0MDB9")  # Tumhara base64 session data
 
 # Tracking system
 def load_tracking():
@@ -106,19 +110,30 @@ def process_groups(bot):
     
     try:
         threads = bot.direct_threads()
+        if not threads:  # Agar threads None ya empty hai
+            print("⚠️ No threads found!")
+            return
+
         for thread in threads:
+            if not thread:  # Agar thread None hai
+                print("⚠️ Skipping invalid thread!")
+                continue
             if not thread.is_group or thread.title == EXCLUDED_GROUP:
                 continue
                 
-            messages = bot.direct_messages(thread_id=thread.id, amount=5)  # Reduced to 5 messages
+            messages = bot.direct_messages(thread_id=thread.id, amount=5)
+            if not messages:  # Agar messages None ya empty hai
+                print(f"⚠️ No messages found in thread {thread.id}!")
+                continue
+
             for msg in messages:
                 if tracking_data['daily_count'] >= DAILY_DM_LIMIT:
                     print("Daily limit reached! Taking 8 hour break...")
                     time.sleep(BREAK_DURATION)
                     tracking_data = reset_daily_counter(load_tracking())
-                    break  # Exit message loop
+                    break
                     
-                if msg.user_id == bot.user_id:
+                if not msg or msg.user_id == bot.user_id:  # Agar msg None hai ya bot ka apna message
                     continue
                     
                 if is_user_eligible(msg.user_id, tracking_data) and not is_private_user(bot, msg.user_id):
@@ -136,11 +151,10 @@ def process_groups(bot):
 def handle_session(client):
     try:
         if SESSION_DATA:
-            # Base64 decode karke JSON string banao, phir dictionary mein convert karo
             session_json = base64.b64decode(SESSION_DATA).decode('utf-8')
             session_dict = json.loads(session_json)
-            client.set_settings(session_dict)  # Dictionary ko set karo
-            client.get_timeline_feed()  # Session verify karo
+            client.set_settings(session_dict)
+            client.get_timeline_feed()
             print("✅ Session loaded from ENV!")
             return client
     except Exception as e:
