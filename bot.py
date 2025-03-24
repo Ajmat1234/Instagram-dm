@@ -57,10 +57,10 @@ DAILY_DM_LIMIT = 30
 DELAY_RANGE = (600, 1200)  # 10-20 minutes
 BREAK_DURATION = 28800  # 8 hours
 
-# Environment Variables
-USERNAME = os.environ["USERNAME"]
-PASSWORD = os.environ["PASSWORD"]
-SESSION_DATA = os.environ.get("SESSION_DATA", "")
+# Environment Variables with fallback
+USERNAME = os.environ.get("USERNAME", "tumhara_username")  # Apna username yahan daalo
+PASSWORD = os.environ.get("PASSWORD", "tumhara_password")  # Apna password yahan daalo
+SESSION_DATA = os.environ.get("SESSION_DATA", "")  # Agar session data hai toh daalo, nahi toh khali chhodo
 
 # Tracking system
 def load_tracking():
@@ -87,13 +87,13 @@ def is_user_eligible(user_id, data):
     return user_id not in data['sent_users'] and data['daily_count'] < DAILY_DM_LIMIT
 
 # Bot functions
-def is_private_user(user_id):
+def is_private_user(bot, user_id):
     try:
         return bot.user_info(user_id).is_private
     except:
         return True
 
-def send_dm(user_id):
+def send_dm(bot, user_id):
     try:
         bot.direct_send(DM_LINK, user_ids=[user_id])
         return True
@@ -101,7 +101,7 @@ def send_dm(user_id):
         print(f"DM Failed: {str(e)}")
         return False
 
-def process_groups():
+def process_groups(bot):
     tracking_data = reset_daily_counter(load_tracking())
     
     try:
@@ -121,8 +121,8 @@ def process_groups():
                 if msg.user_id == bot.user_id:
                     continue
                     
-                if is_user_eligible(msg.user_id, tracking_data) and not is_private_user(msg.user_id):
-                    if send_dm(msg.user_id):
+                if is_user_eligible(msg.user_id, tracking_data) and not is_private_user(bot, msg.user_id):
+                    if send_dm(bot, msg.user_id):
                         tracking_data['sent_users'].append(msg.user_id)
                         tracking_data['daily_count'] += 1
                         save_tracking(tracking_data)
@@ -136,9 +136,9 @@ def process_groups():
 def handle_session(client):
     try:
         if SESSION_DATA:
-            session_dict = json.loads(base64.b64decode(SESSION_DATA))
-            client.load_settings(session_dict)  # Directly load from dict
-            client.get_timeline_feed()  # Verify session
+            session_json = base64.b64decode(SESSION_DATA).decode('utf-8')
+            client.load_settings(session_json)
+            client.get_timeline_feed()
             print("✅ Session loaded from ENV!")
             return client
     except Exception as e:
@@ -146,6 +146,7 @@ def handle_session(client):
     
     try:
         client.login(USERNAME, PASSWORD)
+        print("✅ Logged in successfully!")
         return client
     except Exception as e:
         print(f"❌ Login failed: {str(e)}")
@@ -154,13 +155,13 @@ def handle_session(client):
 # Main execution
 if __name__ == "__main__":
     bot = Client()
-    bot.handle_session = handle_session(bot)
+    bot_instance = handle_session(bot)
     
-    if bot.handle_session:
+    if bot_instance:
         print("🤖 Bot started! Monitoring groups...")
         while True:
             try:
-                process_groups()
+                process_groups(bot_instance)
                 print("Next check in 30 minutes...")
                 time.sleep(1800)  # 30 minutes cycle
             except Exception as e:
