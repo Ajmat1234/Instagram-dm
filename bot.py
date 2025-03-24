@@ -1,156 +1,185 @@
-from instagrapi import Client
-from instagrapi.exceptions import ChallengeRequired, LoginRequired, UserNotFound
-import os
+import instaloader
+from datetime import datetime, timedelta
 import json
+import logging
 import time
 import random
-import base64
-from datetime import datetime, timedelta
+import re
+from typing import List
 
-# Configuration
-EXCLUDED_GROUP = "SHANSKARI_BALAK👻💯"
-DM_LINK = "https://ig.me/j/AbadvPz94HkLPUro/"
-TRACKING_FILE = "dm_tracking.json"
-DAILY_DM_LIMIT = 30
-DELAY_RANGE = (600, 1200)  # 10-20 minutes
-BREAK_DURATION = 28800  # 8 hours
-CHECK_INTERVAL = 1800  # 30 minutes
+# Logging setup
+logging.basicConfig(
+    filename="bot_progress.log",
+    level=logging.INFO,
+    format="%(asctime)s - %(message)s",
+)
 
-# Environment Variables with fallback
-USERNAME = os.environ.get("USERNAME", "tumhara_username")  # Apna username yahan daalo
-PASSWORD = os.environ.get("PASSWORD", "tumhara_password")  # Apna password yahan daalo
-SESSION_DATA = os.environ.get("SESSION_DATA", "eyJ1dWlkcyI6eyJwaG9uZV9pZCI6IjRjYzkwODJlLWU5NzctNDNhMi1hYmNlLTMyMWY4NjE4MTgyZCIsInV1aWQiOiIwMDI2NmE5NS1mM2U3LTRmYjEtYTg1Ny05ZTM5NmM4MjgwZmIiLCJjbGllbnRfc2Vzc2lvbl9pZCI6ImZkNTdkOTlmLTdiNmUtNDY2MC1hNTFmLTU0MDg2MDY4ZTEwYSIsImFkdmVydGlzaW5nX2lkIjoiYmM4YzMzODItOGI2YS00ZWNhLTliNTktNzM4NWI1NzhjNzkzIiwiYW5kcm9pZF9kZXZpY2VfaWQiOiJhbmRyb2lkLWJkM2MyYTNmMDAxY2JjMzEiLCJyZXF1ZXN0X2lkIjoiNWVmNWFmYTItZThhMC00N2JjLTlkNGEtMDAwMzA2YWJjMDM3IiwidHJheV9zZXNzaW9uX2lkIjoiNDg5ZWU2NGEtNGFlYS00OGQwLWFkMTUtNmRiZDEyYzNkZThkIn0sIm1pZCI6IlotQlJhQUFCQUFFOUc5TTZEcXlWZGNNU0E0QVciLCJpZ191X3J1ciI6bnVsbCwiaWdfd3d3X2NsYWltIjpudWxsLCJhdXRob3JpemF0aW9uX2RhdGEiOnsiZHNfdXNlcl9pZCI6IjU3MjU3Mzc3MDYzIiwic2Vzc2lvbmlkIjoiNTcyNTczNzcwNjMlM0E1aEx5NDFsYTJ2bEFWbCUzQTE3JTNBQVllQVdrY0owMDlmQ0F0YU9ocklvSFRCRGpjQ0dwTFR0YWl0OWR1akJnIn0sImNvb2tpZXMiOnt9LCJsYXN0X2xvZ2luIjoxNzQyNzU0MTYxLjk1NDc1NTgsImRldmljZV9zZXR0aW5ncyI6eyJhcHBfdmVyc2lvbiI6IjMxMi4wLjAuMjUuMTE5IiwiYW5kcm9pZF92ZXJzaW9uIjozNCwiYW5kcm9pZF9yZWxlYXNlIjoiMTQuMC4wIiwiZHBpIjoiNDgwZHBpIiwicmVzb2x1dGlvbiI6IjEwODB4MjQwMCIsIm1hbnVmYWN0dXJlciI6InNhbXN1bmciLCJkZXZpY2UiOiJTTVM5MThCIiwibW9kZWwiOiJHYWxheHkgUzIzIFVsdHJhIn0sInVzZXJfYWdlbnQiOiJJbnN0YWdyYW0gMjY5LjAuMC4xOC43NSBBbmRyb2lkICgyNi84LjAuMDsgNDgwZHBpOyAxMDgweDE5MjA7IE9uZVBsdXM7IDZUIERldjsgZGV2aXRyb247IHFjb207IGVuX1VTOzMxNDY2NTI1NikiLCJjb3VudHJ5IjoiVVMiLCJjb3VudHJ5X2NvZGUiOjEsImxvY2FsZSI6ImVuX1VTIiwidGltZXpvbmVfb2Zmc2V0IjotMTQ0MDB9")  # Tumhara base64 session data
+# Instaloader instance without login
+L = instaloader.Instaloader()
+L.login = None  # Ensure no login
 
-# Tracking system
-def load_tracking():
-    try:
-        with open(TRACKING_FILE, "r") as f:
-            data = json.load(f)
-            data['last_reset'] = datetime.fromisoformat(data['last_reset']) if isinstance(data.get('last_reset'), str) else datetime.now()
-            return data
-    except:
-        return {'sent_users': [], 'daily_count': 0, 'last_reset': datetime.now()}
+# JSON file to store active users
+JSON_FILE = "active_girls.json"
 
-def save_tracking(data):
-    data['last_reset'] = data['last_reset'].isoformat()
-    with open(TRACKING_FILE, "w") as f:
-        json.dump(data, f)
-
-def reset_daily_counter(data):
-    if datetime.now() - data['last_reset'] >= timedelta(hours=24):
-        data['daily_count'] = 0
-        data['last_reset'] = datetime.now()
-    return data
-
-def is_user_eligible(user_id, data):
-    return user_id not in data['sent_users'] and data['daily_count'] < DAILY_DM_LIMIT
-
-# Bot functions
-def is_private_user(bot, user_id):
-    try:
-        return bot.user_info(user_id).is_private
-    except:
-        return True
-
-def send_dm(bot, user_id):
-    try:
-        bot.direct_send(DM_LINK, user_ids=[user_id])
-        return True
-    except Exception as e:
-        print(f"DM Failed: {str(e)}")
-        return False
-
-def process_groups(bot):
-    tracking_data = reset_daily_counter(load_tracking())
+# Function to check if user is likely a girl
+def is_likely_female(username: str, full_name: str = None, bio: str = None) -> bool:
+    # Common Indian female names (expanded)
+    female_names = [
+        "priya", "anju", "neha", "simran", "pooja", "rani", "kavita", "meera",
+        "sonia", "tanu", "divya", "isha", "kriti", "shruti", "vidya", "jaya",
+        "rekha", "sneha", "radha", "lata", "geeta", "mona", "tina", "ritu",
+        "arti", "shweta", "manju", "kiran", "nisha", "preeti", "anjali"
+    ]
     
-    while True:
-        try:
-            print(f"\n🌀 {datetime.now().strftime('%H:%M:%S')} - scanning...")
-            threads = bot.direct_threads(amount=10)  # Check only 10 latest threads
-            if threads is None:
-                print("⚠️ No threads received from Instagram! Session might be expired.")
-                return False  # Trigger session refresh
+    # Common female nicknames
+    female_nicknames = [
+        "babu", "doll", "cute", "sweet", "baby", "gudiya", "pari", "angel",
+        "star", "moon", "sunny", "pinky", "chinky", "tweety", "bubbly"
+    ]
+    
+    # Common female last names
+    female_lastnames = [
+        "sharma", "verma", "gupta", "singh", "kaur", "patel", "mehta",
+        "jain", "yadav", "thakur", "chauhan", "rana", "reddy", "nair"
+    ]
+    
+    # Female keywords in bio
+    female_keywords = [
+        "girl", "she", "queen", "princess", "lady", "di", "sis", "bhabhi",
+        "beauty", "cute", "angel", "doll", "fashion", "makeup", "love",
+        "mom", "wife", "sister", "daughter", "fairy", "diva"
+    ]
+    
+    # BTS-related names/usernames (popular among girls)
+    bts_related = [
+        "bts", "army", "jungkook", "jimin", "taehyung", "v", "jin", "suga",
+        "jhope", "rm", "kpop", "bangtan", "purple", "borobudur"
+    ]
+    
+    # Common female emojis
+    female_emojis = [
+        "💕", "💖", "💗", "💓", "💞", "💜", "🌸", "🌺", "🌹", "💐",
+        "✨", "🌟", "💋", "👑", "🎀", "🦋", "🐾", "🌈", "🍓", "🍒"
+    ]
+    
+    # Convert all to lowercase for matching
+    username_lower = username.lower()
+    full_name_lower = full_name.lower() if full_name else ""
+    bio_lower = bio.lower() if bio else ""
+    
+    # Check username
+    if any(name in username_lower for name in female_names + female_nicknames):
+        return True
+    if any(lastname in username_lower for lastname in female_lastnames):
+        return True
+    if any(bts in username_lower for bts in bts_related):
+        return True
+    
+    # Check full name
+    if full_name_lower:
+        if any(name in full_name_lower for name in female_names):
+            return True
+        if any(lastname in full_name_lower for lastname in female_lastnames):
+            return True
+    
+    # Check bio
+    if bio_lower:
+        if any(keyword in bio_lower for keyword in female_keywords):
+            return True
+        if any(emoji in bio for emoji in female_emojis):  # Emoji check in original bio
+            return True
+        if any(bts in bio_lower for bts in bts_related):
+            return True
+    
+    # Regex for feminine patterns
+    if re.search(r"[aiey]$", username_lower):  # Ends with 'a', 'i', 'e', 'y'
+        return True
+    if re.search(r"xx$", username_lower):  # Ends with 'xx' (common in girl usernames)
+        return True
+    
+    # Fallback: No strong male indicators
+    male_keywords = ["boy", "bro", "king", "dude", "guy", "ladka", "boss"]
+    if not any(mk in username_lower or (full_name_lower and mk in full_name_lower) or (bio_lower and mk in bio_lower) for mk in male_keywords):
+        return True
+    
+    return False
 
-            for thread in threads:
-                if thread is None:
-                    print("⚠️ Skipping invalid thread!")
-                    continue
-                if not getattr(thread, 'is_group', False) or getattr(thread, 'title', '') == EXCLUDED_GROUP:
-                    continue
+# Function to load existing JSON data
+def load_json_data() -> List[str]:
+    try:
+        with open(JSON_FILE, "r") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return []
 
-                messages = bot.direct_messages(thread_id=thread.id, amount=5)
-                if messages is None:
-                    print(f"⚠️ No messages received for thread {thread.id}!")
-                    continue
+# Function to save to JSON
+def save_json_data(data: List[str]):
+    with open(JSON_FILE, "w") as f:
+        json.dump(data, f, indent=4)
 
-                for msg in messages:
-                    if msg is None or getattr(msg, 'user_id', None) == bot.user_id:
+# Main bot logic
+def scrape_active_girls():
+    logging.info("Bot started processing...")
+    
+    # Load existing data
+    active_girls = load_json_data()
+    
+    # Target hashtag for reels (female-centric)
+    hashtag = "beauty"  # Change to any hashtag like "fashion", "makeup", etc.
+    
+    # Scrape reels from hashtag
+    try:
+        posts = L.get_hashtag_posts(hashtag)
+        for post in posts:
+            # Only recent posts (last 24 hours)
+            if post.date > datetime.now() - timedelta(hours=24):
+                logging.info(f"Scraping comments from post: {post.shortcode}")
+                
+                # Get commenters
+                for comment in post.get_comments():
+                    username = comment.owner.username
+                    
+                    # Skip if already in list
+                    if username in active_girls:
                         continue
-
-                    if tracking_data['daily_count'] >= DAILY_DM_LIMIT:
-                        print("Daily limit reached! Taking 8 hour break...")
-                        time.sleep(BREAK_DURATION)
-                        tracking_data = reset_daily_counter(load_tracking())
-                        break
-
-                    user_id = getattr(msg, 'user_id', None)
-                    if user_id and is_user_eligible(user_id, tracking_data) and not is_private_user(bot, user_id):
-                        if send_dm(bot, user_id):
-                            tracking_data['sent_users'].append(user_id)
-                            tracking_data['daily_count'] += 1
-                            save_tracking(tracking_data)
-                            delay = random.randint(*DELAY_RANGE)
-                            print(f"✅ DM sent to user {user_id}! Next DM in {delay//60} minutes...")
-                            time.sleep(delay)
-
-            break  # Exit inner loop after one scan
-
-        except ChallengeRequired:
-            print("🔒 Challenge detected, restarting in 5 minutes...")
-            time.sleep(300)
-            return False
-        except Exception as e:
-            print(f"⚠️ Error: {str(e)}")
-            time.sleep(300)
-            return False
-
-# Session handling with refresh option
-def handle_session(client, force_login=False):
-    if not force_login:
-        try:
-            if SESSION_DATA:
-                session_json = base64.b64decode(SESSION_DATA).decode('utf-8')
-                session_dict = json.loads(session_json)
-                client.set_settings(session_dict)
-                client.get_timeline_feed()
-                print("✅ Session loaded from ENV!")
-                return client
-        except Exception as e:
-            print(f"⚠️ Session error: {str(e)}")
+                    
+                    # Get profile details (public only)
+                    try:
+                        profile = instaloader.Profile.from_username(L.context, username)
+                        full_name = profile.full_name
+                        bio = profile.biography
+                    except Exception as e:
+                        full_name = None
+                        bio = None
+                        logging.warning(f"Could not fetch profile for {username}: {e}")
+                    
+                    # Check if likely female
+                    if is_likely_female(username, full_name, bio):
+                        active_girls.append(username)
+                        logging.info(f"Found active girl: @{username} (Name: {full_name or 'N/A'})")
+                    
+                    # Save every 5 users
+                    if len(active_girls) % 5 == 0:
+                        save_json_data(active_girls)
+                        logging.info(f"Saved {len(active_girls)} users to {JSON_FILE}")
+                    
+                    # Check if 20 users reached
+                    if len(active_girls) >= 20:
+                        logging.info(f"Reached 20 active girls: {active_girls}")
+                        return active_girls
+                
+                # Random delay to avoid detection
+                time.sleep(random.uniform(5, 15))  # Increased range for safety
     
-    try:
-        client.login(USERNAME, PASSWORD)
-        print("✅ Logged in successfully!")
-        return client
     except Exception as e:
-        print(f"❌ Login failed: {str(e)}")
-        return None
-
-# Main execution
-if __name__ == "__main__":
-    bot = Client()
-    bot_instance = handle_session(bot)
+        logging.error(f"Error occurred: {e}")
     
-    if bot_instance:
-        print("🤖 Bot started! Monitoring groups...")
-        while True:
-            if not process_groups(bot_instance):
-                print("⚠️ Session issue detected, attempting to refresh...")
-                bot_instance = handle_session(bot, force_login=True)
-                if not bot_instance:
-                    print("❌ Bot failed to restart, exiting...")
-                    break
-            print("Next check in 30 minutes...")
-            time.sleep(CHECK_INTERVAL)
-    else:
-        print("❌ Bot failed to start")
+    finally:
+        save_json_data(active_girls)
+        logging.info(f"Bot finished. Total active girls found: {len(active_girls)}")
+    
+    return active_girls
+
+if __name__ == "__main__":
+    active_girls = scrape_active_girls()
+    print(f"Check 'bot_progress.log' for progress and '{JSON_FILE}' for results!")
