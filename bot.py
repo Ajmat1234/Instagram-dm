@@ -1,4 +1,5 @@
 import instaloader
+from instaloader import Hashtag
 from datetime import datetime, timedelta
 import json
 import logging
@@ -7,24 +8,31 @@ import random
 import re
 from typing import List
 
-# Logging setup
+# Configure logging
 logging.basicConfig(
     filename="bot_progress.log",
     level=logging.INFO,
-    format="%(asctime)s - %(message)s",
+    format="%(asctime)s - %(levelname)s - %(message)s",
+)
+logger = logging.getLogger(__name__)
+
+# Configure Instaloader with modern parameters
+L = instaloader.Instaloader(
+    max_connection_attempts=3,
+    request_timeout=60,
+    sleep=True,
+    sleep_time=300,  # 5 minutes between batches
+    user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
 )
 
-# Instaloader instance without login
-L = instaloader.Instaloader()
-L.login = None  # Ensure no login
+# Improved proxy configuration (uncomment if needed)
+# L.context._session.proxies = {
+#     "http": "http://username:password@proxy:port",
+#     "https": "http://username:password@proxy:port"
+# }
 
-# Optional: Add proxy (uncomment and configure if needed)
-# L.context._session.proxies = {"http": "http://your_proxy:port", "https": "http://your_proxy:port"}
-
-# JSON file to store active users
 JSON_FILE = "active_girls.json"
 
-# Function to check if user is likely a girl
 def is_likely_female(username: str, full_name: str = None, bio: str = None) -> bool:
     female_names = [
         "priya", "anju", "neha", "simran", "pooja", "rani", "kavita", "meera",
@@ -84,82 +92,106 @@ def is_likely_female(username: str, full_name: str = None, bio: str = None) -> b
     
     return False
 
-# Function to load existing JSON data
 def load_json_data() -> List[str]:
     try:
         with open(JSON_FILE, "r") as f:
             return json.load(f)
-    except FileNotFoundError:
+    except (FileNotFoundError, json.JSONDecodeError):
         return []
 
-# Function to save to JSON
 def save_json_data(data: List[str]):
     with open(JSON_FILE, "w") as f:
-        json.dump(data, f, indent=4)
+        json.dump(data, f, indent=4, ensure_ascii=False)
 
-# Main bot logic with rotating hashtags
+def handle_hashtag_errors(hashtag: str):
+    """Handle rate limits and temporary bans"""
+    logger.warning(f"Potential rate limit detected for #{hashtag}")
+    sleep_time = random.randint(600, 1200)  # 10-20 minutes
+    logger.info(f"Sleeping for {sleep_time//60} minutes")
+    time.sleep(sleep_time)
+
+def get_hashtag_posts_safe(hashtag: str):
+    """Safe method to get hashtag posts with modern Instaloader API"""
+    try:
+        hashtag_obj = Hashtag.from_name(L.context, hashtag)
+        return hashtag_obj.get_posts()
+    except instaloader.exceptions.QueryReturnedNotFoundException:
+        logger.error(f"Hashtag #{hashtag} not found or banned")
+        return []
+    except instaloader.exceptions.ConnectionException as e:
+        logger.error(f"Connection error for #{hashtag}: {str(e)}")
+        handle_hashtag_errors(hashtag)
+        return []
+
 def scrape_active_girls():
-    logging.info("Bot started processing...")
+    logger.info("Bot started processing...")
     
     active_girls = load_json_data()
-    
-    # Rotating hashtags
     hashtags = ["beauty", "fashion", "makeup", "reelsindia", "bts", "girls"]
-    hashtag_index = 0
     
-    while hashtag_index < len(hashtags) and len(active_girls) < 20:
-        hashtag = hashtags[hashtag_index]
-        logging.info(f"Trying hashtag: #{hashtag}")
+    for hashtag in hashtags:
+        if len(active_girls) >= 20:
+            break
+            
+        logger.info(f"Processing hashtag: #{hashtag}")
+        posts = get_hashtag_posts_safe(hashtag)
         
+        if not posts:
+            continue
+            
         try:
-            posts = L.get_hashtag_posts(hashtag)
             for post in posts:
-                if post.date > datetime.now() - timedelta(hours=24):
-                    logging.info(f"Scraping comments from post: {post.shortcode}")
+                if len(active_girls) >= 20:
+                    break
                     
-                    for comment in post.get_comments():
+                if post.date < datetime.now() - timedelta(hours=24):
+                    continue
+                    
+                logger.info(f"Processing post: {post.shortcode}")
+                
+                try:
+                    comments = post.get_comments()
+                except Exception as e:
+                    logger.error(f"Error getting comments: {str(e)}")
+                    continue
+                
+                for comment in comments:
+                    try:
                         username = comment.owner.username
                         if username in active_girls:
                             continue
+                            
+                        # Add random delay between profile checks
+                        time.sleep(random.uniform(5, 15))
                         
-                        try:
-                            profile = instaloader.Profile.from_username(L.context, username)
-                            full_name = profile.full_name
-                            bio = profile.biography
-                        except Exception as e:
-                            full_name = None
-                            bio = None
-                            logging.warning(f"Could not fetch profile for {username}: {e}")
-                        
-                        if is_likely_female(username, full_name, bio):
+                        profile = instaloader.Profile.from_username(L.context, username)
+                        if is_likely_female(username, profile.full_name, profile.biography):
                             active_girls.append(username)
-                            logging.info(f"Found active girl: @{username} (Name: {full_name or 'N/A'})")
-                        
-                        if len(active_girls) % 5 == 0:
+                            logger.info(f"Added {username} - Total: {len(active_girls)}")
                             save_json_data(active_girls)
-                            logging.info(f"Saved {len(active_girls)} users to {JSON_FILE}")
+                            
+                    except instaloader.exceptions.ProfileNotExistsException:
+                        continue
+                    except Exception as e:
+                        logger.error(f"Error processing comment: {str(e)}")
+                        continue
                         
-                        if len(active_girls) >= 20:
-                            logging.info(f"Reached 20 active girls: {active_girls}")
-                            return active_girls
-                    
-                    time.sleep(random.uniform(10, 20))  # Increased delay
+                # Random delay between posts
+                time.sleep(random.uniform(15, 30))
         
-        except instaloader.exceptions.QueryReturnedNotFoundException:
-            logging.warning(f"Hashtag #{hashtag} returned 404. Switching to next hashtag.")
-            hashtag_index += 1
-            time.sleep(30)  # Wait before switching
-            continue
         except Exception as e:
-            logging.error(f"Error with #{hashtag}: {e}")
-            hashtag_index += 1
-            time.sleep(30)
+            logger.error(f"Critical error processing #{hashtag}: {str(e)}")
+            handle_hashtag_errors(hashtag)
             continue
-    
-    save_json_data(active_girls)
-    logging.info(f"Bot finished. Total active girls found: {len(active_girls)}")
+            
+    logger.info(f"Completed. Total found: {len(active_girls)}")
     return active_girls
 
 if __name__ == "__main__":
-    active_girls = scrape_active_girls()
-    print(f"Check 'bot_progress.log' for progress and '{JSON_FILE}' for results!")
+    try:
+        active_girls = scrape_active_girls()
+        print(f"Results saved to {JSON_FILE}")
+    except KeyboardInterrupt:
+        logger.warning("Process interrupted by user")
+    except Exception as e:
+        logger.error(f"Fatal error: {str(e)}")
