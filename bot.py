@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 
 # Enhanced monkey patch for thread extraction with None check
 def patched_extract_direct_thread(data: dict) -> DirectThread:
-    if not data or not isinstance(data, dict):  # Agar data None ya dict nahi hai
+    if not data or not isinstance(data, dict):
         print("⚠️ Thread data is None or invalid!")
         return None
 
@@ -60,6 +60,7 @@ TRACKING_FILE = "dm_tracking.json"
 DAILY_DM_LIMIT = 30
 DELAY_RANGE = (600, 1200)  # 10-20 minutes
 BREAK_DURATION = 28800  # 8 hours
+CHECK_INTERVAL = 1800  # 30 minutes
 
 # Environment Variables with fallback
 USERNAME = os.environ.get("USERNAME", "tumhara_username")  # Apna username yahan daalo
@@ -108,44 +109,52 @@ def send_dm(bot, user_id):
 def process_groups(bot):
     tracking_data = reset_daily_counter(load_tracking())
     
-    try:
-        threads = bot.direct_threads()
-        if not threads:  # Agar threads None ya empty hai
-            print("⚠️ No threads found!")
-            return
+    while True:
+        try:
+            print(f"\n🌀 {datetime.now().strftime('%H:%M:%S')} - scanning...")
+            threads = bot.direct_threads(amount=10)  # Check only 10 latest threads
+            if not threads:
+                print("⚠️ No threads found!")
+                break
 
-        for thread in threads:
-            if not thread:  # Agar thread None hai
-                print("⚠️ Skipping invalid thread!")
-                continue
-            if not thread.is_group or thread.title == EXCLUDED_GROUP:
-                continue
-                
-            messages = bot.direct_messages(thread_id=thread.id, amount=5)
-            if not messages:  # Agar messages None ya empty hai
-                print(f"⚠️ No messages found in thread {thread.id}!")
-                continue
-
-            for msg in messages:
-                if tracking_data['daily_count'] >= DAILY_DM_LIMIT:
-                    print("Daily limit reached! Taking 8 hour break...")
-                    time.sleep(BREAK_DURATION)
-                    tracking_data = reset_daily_counter(load_tracking())
-                    break
-                    
-                if not msg or msg.user_id == bot.user_id:  # Agar msg None hai ya bot ka apna message
+            for thread in threads:
+                if not thread or not thread.is_group or thread.title == EXCLUDED_GROUP:
                     continue
-                    
-                if is_user_eligible(msg.user_id, tracking_data) and not is_private_user(bot, msg.user_id):
-                    if send_dm(bot, msg.user_id):
-                        tracking_data['sent_users'].append(msg.user_id)
-                        tracking_data['daily_count'] += 1
-                        save_tracking(tracking_data)
-                        delay = random.randint(*DELAY_RANGE)
-                        print(f"Next DM in {delay//60} minutes...")
-                        time.sleep(delay)
-    except Exception as e:
-        print(f"Group processing error: {str(e)}")
+
+                messages = bot.direct_messages(thread_id=thread.id, amount=5)  # Check 5 latest messages
+                if not messages:
+                    print(f"⚠️ No messages in thread {thread.id}!")
+                    continue
+
+                for msg in messages:
+                    if not msg or msg.user_id == bot.user_id:
+                        continue
+
+                    if tracking_data['daily_count'] >= DAILY_DM_LIMIT:
+                        print("Daily limit reached! Taking 8 hour break...")
+                        time.sleep(BREAK_DURATION)
+                        tracking_data = reset_daily_counter(load_tracking())
+                        break
+
+                    if is_user_eligible(msg.user_id, tracking_data) and not is_private_user(bot, msg.user_id):
+                        if send_dm(bot, msg.user_id):
+                            tracking_data['sent_users'].append(msg.user_id)
+                            tracking_data['daily_count'] += 1
+                            save_tracking(tracking_data)
+                            delay = random.randint(*DELAY_RANGE)
+                            print(f"✅ DM sent to user {msg.user_id}! Next DM in {delay//60} minutes...")
+                            time.sleep(delay)
+
+            break  # Exit inner loop after one scan
+
+        except ChallengeRequired:
+            print("🔒 Challenge detected, restarting in 5 minutes...")
+            time.sleep(300)
+            return
+        except Exception as e:
+            print(f"⚠️ Error: {str(e)}")
+            time.sleep(300)
+            return
 
 # Session handling
 def handle_session(client):
@@ -176,13 +185,8 @@ if __name__ == "__main__":
     if bot_instance:
         print("🤖 Bot started! Monitoring groups...")
         while True:
-            try:
-                process_groups(bot_instance)
-                print("Next check in 30 minutes...")
-                time.sleep(1800)  # 30 minutes cycle
-            except Exception as e:
-                print(f"Critical error: {str(e)}")
-                print("Restarting in 5 minutes...")
-                time.sleep(300)
+            process_groups(bot_instance)
+            print("Next check in 30 minutes...")
+            time.sleep(CHECK_INTERVAL)
     else:
         print("❌ Bot failed to start")
