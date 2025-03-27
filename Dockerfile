@@ -1,10 +1,9 @@
-FROM node:20-slim
+FROM node:20-bullseye # Slim image नहीं
 
-# ============ System Dependencies ============
-RUN apt-get update -o Acquire::CheckValid-Until=false -o Acquire::Check-Date=false && \
-    apt-get install -y --no-install-recommends \
+# ================= System Dependencies =================
+RUN apt-get update -o Acquire::CheckValid-Until=false \
+    && apt-get install -y --no-install-recommends \
     wget \
-    python3 \
     xvfb \
     libgl1 \
     libnss3 \
@@ -12,29 +11,30 @@ RUN apt-get update -o Acquire::CheckValid-Until=false -o Acquire::Check-Date=fal
     libasound2 \
     libxtst6 \
     libgbm1 \
+    fonts-freefont-ttf \
     && rm -rf /var/lib/apt/lists/*
 
-# ============ Chrome Install ============ 
-RUN wget -q https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb && \
-    dpkg -x google-chrome-stable_current_amd64.deb /tmp/chrome && \
-    mv /tmp/chrome/opt/google/chrome/chrome /usr/bin/google-chrome-stable && \
-    rm -rf /tmp/chrome google-chrome-stable_current_amd64.deb
+# ================= Chrome Installation =================
+RUN wget -q https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb \
+    && dpkg -x google-chrome-stable_current_amd64.deb /tmp/chrome \
+    && mv /tmp/chrome/opt/google/chrome/chrome /usr/bin/google-chrome-stable \
+    && rm -rf /tmp/chrome google-chrome-stable_current_amd64.deb
 
-# ============ PM2 Global Install ============
-RUN npm install -g pm2@latest --unsafe-perm
+# ================= PM2 Setup =================
+RUN npm install -g pm2@latest --unsafe-perm --scripts-prepend-node-path=true
+ENV PATH="/usr/local/bin:${PATH}"
 
-# ============ App Setup ============ 
+# ================= App Setup =================
 WORKDIR /app
 COPY package*.json .
 RUN npm install --production
-
 COPY . .
 
-# ============ Fix Permissions ============
-RUN chmod +x /usr/bin/google-chrome-stable
+# ================= Permissions =================
+RUN chmod 755 /usr/bin/google-chrome-stable
 
-# ============ Run Commands ============ 
-ENV DISPLAY=":99" \
-    CHROME_BIN="/usr/bin/google-chrome-stable"
+# ================= Startup Script =================
+RUN echo '#!/bin/sh\nXvfb :99 -screen 0 1024x768x24 &\nexec pm2-runtime ecosystem.config.js' > /start.sh \
+    && chmod +x /start.sh
 
-CMD Xvfb :99 -screen 0 1024x768x24 & pm2-runtime ecosystem.config.js
+CMD ["/start.sh"]
