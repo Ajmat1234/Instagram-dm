@@ -1,8 +1,7 @@
 FROM node:20
 
-# सभी जरूरी dependencies इंस्टॉल करें
-RUN apt-get update && \
-    apt-get install -y \
+# 1. सभी जरूरी dependencies इंस्टॉल करें
+RUN apt-get update && apt-get install -y \
     wget \
     gnupg \
     ca-certificates \
@@ -39,31 +38,38 @@ RUN apt-get update && \
     libxss1 \
     libxtst6 \
     lsb-release \
-    xdg-utils
+    xdg-utils \
+    fonts-ipafont-gothic \
+    fonts-wqy-zenhei \
+    fonts-thai-tlwg \
+    fonts-kacst \
+    fonts-freefont-ttf \
+    --no-install-recommends
 
-# Google Chrome स्थापित करें
-RUN wget -q -O- https://dl.google.com/linux/linux_signing_key.pub | gpg --dearmor > /etc/apt/trusted.gpg.d/google.gpg && \
-    echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list && \
-    apt-get update && \
-    apt-get install -y google-chrome-stable --no-install-recommends
+# 2. Google Chrome स्थापित करें
+RUN wget -q -O- https://dl.google.com/linux/linux_signing_key.pub | gpg --dearmor > /etc/apt/trusted.gpg.d/google.gpg \
+    && echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list \
+    && apt-get update \
+    && apt-get install -y google-chrome-stable \
+    && rm -rf /var/lib/apt/lists/*
 
-# Python और pip इंस्टॉल करें
+# 3. Python और Flask dependencies
 RUN apt-get install -y python3 python3-pip
-
-# Python dependencies
 COPY requirements.txt .
 RUN pip3 install -r requirements.txt
 
-# Node dependencies
-COPY package*.json ./
-RUN npm install
+# 4. Non-root user बनाएं (Puppeteer के लिए जरूरी)
+RUN groupadd -r pptruser && useradd -r -g pptruser -G audio,video pptruser \
+    && mkdir -p /home/pptruser/Downloads \
+    && chown -R pptruser:pptruser /home/pptruser
 
-# एप्लिकेशन फाइल्स कॉपी करें
-COPY . .
-
-# Permissions सेट करें
+# 5. एप्लिकेशन फाइल्स कॉपी और permissions सेट करें
+COPY --chown=pptruser:pptruser . .
 RUN chmod -R 755 /usr/bin/google-chrome-stable
 
-# PM2 से दोनों प्रोसेस चलाएं
+# 6. PM2 कॉन्फ़िगरेशन
 RUN npm install pm2 -g
+USER pptruser
+
+# 7. PM2 ecosystem फाइल
 CMD ["pm2-runtime", "ecosystem.config.js"]
