@@ -8,9 +8,9 @@ import json
 
 app = Flask(__name__)
 
-USERNAME = os.getenv("IG_USERNAME")
-PASSWORD = os.getenv("IG_PASSWORD")
-MESSAGE = os.getenv("IG_MESSAGE", "Welcome to our group!")
+USERNAME = os.getenv("USERNAME")
+PASSWORD = os.getenv("PASSWORD")
+MESSAGE = os.getenv("MESSAGE", "Welcome to our group!")
 TRACKING_FILE = "user_track.json"
 
 bot = Client()
