@@ -6,6 +6,7 @@ import random
 import os
 import base64
 from datetime import datetime, timedelta
+from pytz import timezone  # टाइमज़ोन के लिए नया इम्पोर्ट
 
 # Configuration
 WELCOME_MSGS = [
@@ -40,7 +41,7 @@ def should_welcome(user_id):
     if user_id not in users:
         return True
     last_mentioned = datetime.fromisoformat(users[user_id])
-    return datetime.now() - last_mentioned > timedelta(hours=24)  # 24-hour cooldown
+    return datetime.now(timezone.utc) - last_mentioned > timedelta(hours=12)  # UTC में बदला
 
 # Load session file from environment variable
 def load_session_from_env():
@@ -72,7 +73,7 @@ def forever_bot():
     last_checked_message_id = None  # To track the latest message processed
     while True:
         try:
-            print(f"\n🌀 {datetime.now().strftime('%H:%M:%S')} - Scanning...")
+            print(f"\n🌀 {datetime.now(timezone.utc).strftime('%H:%M:%S')} - Scanning...")  # UTC में बदला
             threads = bot.direct_threads(amount=3)  # Reduced to 3 for stealth
             for thread in threads:
                 if thread.is_group:
@@ -82,11 +83,11 @@ def forever_bot():
                             continue  # Skip if already processed
                         if msg.user_id != bot.user_id and should_welcome(msg.user_id):
                             # Check if message is recent (within 1 minute)
-                            if msg.timestamp > datetime.now() - timedelta(minutes=1):
+                            if msg.timestamp > datetime.now(timezone.utc) - timedelta(minutes=1):  # UTC में बदला
                                 username = get_username(msg.user_id)
                                 welcome_msg = random.choice(WELCOME_MSGS).format(username=username)
                                 bot.direct_answer(thread_id=thread.id, text=welcome_msg)
-                                save_user(msg.user_id, datetime.now())
+                                save_user(msg.user_id, datetime.now(timezone.utc))  # UTC में बदला
                                 print(f"👋 Sent to @{username}: {welcome_msg}")
                                 time.sleep(MESSAGE_DELAY)  # Random delay for reply
                         last_checked_message_id = msg.id  # Update last processed message
@@ -129,7 +130,7 @@ def start_bot():
         bot.login(USERNAME, PASSWORD)
         bot.dump_settings("ig_session.json")
 
-    print(f"🚀 Bot started: {datetime.now().strftime('%d-%m-%Y %H:%M')}")
+    print(f"🚀 Bot started: {datetime.now(timezone.utc).strftime('%d-%m-%Y %H:%M')}")  # UTC में बदला
     forever_bot()
 
 if __name__ == "__main__":
