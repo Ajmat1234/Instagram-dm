@@ -1,22 +1,7 @@
-# Base Image
-FROM mcr.microsoft.com/playwright/python:v1.39.0
+FROM mcr.microsoft.com/playwright/python:v1.40.0-jammy
 
-# Set working directory
 WORKDIR /app
-
-# Copy Python dependencies
-COPY requirements.txt .
+COPY . /app
 RUN pip install -r requirements.txt
 
-# Copy Node dependencies
-COPY package*.json .
-RUN npm install --production
-
-# Copy all project files
-COPY . .
-
-# Install Playwright browsers
-RUN playwright install
-
-# Run Flask and Node
-CMD ["sh", "-c", "gunicorn main:app -b 0.0.0.0:$PORT & node bot.js"]
+CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:10000", "main:app"]
