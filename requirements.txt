@@ -2,3 +2,4 @@ instagrapi==1.17.4
 Flask==2.1.3
 pytz==2022.7
 gunicorn
+Pillow==8.1.1
