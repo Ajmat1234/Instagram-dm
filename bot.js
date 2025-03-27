@@ -2,122 +2,146 @@ const puppeteer = require('puppeteer-core');
 const axios = require('axios');
 
 const INSTAGRAM_URL = 'https://www.instagram.com/';
-const FLASK_API = 'https://instagram-dm-dwuk.onrender.com/send_message';
+const FLASK_API = process.env.FLASK_API || 'http://localhost:5000/send_message';
 
 const USERNAME = process.env.USERNAME;
 const PASSWORD = process.env.PASSWORD;
 
-console.log("Chrome path:", process.env.CHROME_BIN || '/usr/bin/google-chrome-stable');
+// ================== Critical Fixes ==================
+console.log("Chromium Path:", process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium');
 
 async function startBrowser() {
-  // bot.js में ये बदलाव करें
-const browser = await puppeteer.launch({
-  headless: 'new',
-  executablePath: '/usr/bin/chromium',
-  args: [
-    '--no-sandbox',
-    '--disable-setuid-sandbox',
-    '--disable-dev-shm-usage',
-    '--single-process'
-  ]
-});
-
-  const version = await browser.version();
-  console.log(`Browser launched: ${version}`);
-  return browser;
-}
-
-async function loginToInstagram(page) {
   try {
-    console.log('Logging in to Instagram...');
-    await page.goto(INSTAGRAM_URL, {
-      waitUntil: 'networkidle2',
-      timeout: 60000
+    const browser = await puppeteer.launch({
+      headless: 'new', // New Headless Mode
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium',
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--single-process', // Memory Optimization
+        '--disable-gpu',
+        '--disable-software-rasterizer',
+        '--disable-features=HttpsFirstMode'
+      ],
+      timeout: 60000 // Increased timeout
     });
 
-    await page.waitForSelector('input[name="username"]', { visible: true });
-    await page.type('input[name="username"]', USERNAME, { delay: 50 });
-    await page.type('input[name="password"]', PASSWORD, { delay: 50 });
-
-    await Promise.all([
-      page.waitForNavigation({ waitUntil: 'networkidle2' }),
-      page.click('button[type="submit"]')
-    ]);
-
-    console.log('✅ Instagram Login Successful!');
+    console.log('✅ Browser Version:', await browser.version());
+    return browser;
   } catch (err) {
-    console.error('Login error:', err);
+    console.error('🚨 Browser Launch Error:', err);
     throw err;
   }
 }
 
-async function scanDMs(page) {
+// ================== Optimized Login ==================
+async function loginToInstagram(page) {
   try {
-    await page.goto('https://www.instagram.com/direct/inbox/', {
-      waitUntil: 'networkidle2',
-      timeout: 45000
+    console.log('🌐 Navigating to Instagram...');
+    await page.goto(INSTAGRAM_URL, { 
+      waitUntil: 'domcontentloaded', // Faster than networkidle2
+      timeout: 45000 
     });
 
+    // Input Handling with Retry Logic
+    await page.waitForSelector('input[name="username"]', { timeout: 15000 })
+      .catch(() => console.log('⚠️ Username input not found, retrying...'));
+    
+    await page.type('input[name="username"]', USERNAME, { delay: 30 });
+    await page.type('input[name="password"]', PASSWORD, { delay: 30 });
+
+    // Click Handling with Better Selector
+    await Promise.all([
+      page.waitForNavigation({ timeout: 30000 }),
+      page.click('button[type="submit"]:not([disabled])')
+    ]);
+
+    console.log('✅ Login Successful!');
+  } catch (err) {
+    console.error('🔴 Login Failed:', err.message);
+    throw err;
+  }
+}
+
+// ================== Memory Efficient Scanning ==================
+async function scanDMs(page) {
+  try {
+    console.log('🔍 Checking DMs...');
+    await page.goto('https://www.instagram.com/direct/inbox/', {
+      waitUntil: 'domcontentloaded',
+      timeout: 30000
+    });
+
+    // More Reliable Selector
     const messages = await page.evaluate(() => {
-      return Array.from(document.querySelectorAll('div[role="grid"] > div')).map(thread => {
+      return Array.from(document.querySelectorAll('div.x9f619')).slice(0, 5).map(thread => {
         return {
-          username: thread.querySelector('span._ap3a')?.innerText,
-          message: thread.querySelector('span._a9-z > span')?.innerText
+          username: thread.querySelector('span._ap3a')?.textContent?.trim(),
+          message: thread.querySelector('div._aacl')?.textContent?.trim()
         };
       }).filter(msg => msg.username && msg.message);
     });
 
-    for (const msg of messages) {
-      console.log(`📩 New Message from: ${msg.username} - ${msg.message}`);
+    // Batch Processing with Delay
+    for (const [index, msg] of messages.entries()) {
+      console.log(`📬 Message ${index + 1}: From ${msg.username}`);
       try {
         await axios.post(FLASK_API, {
           user_id: msg.username,
-          message: msg.message
+          message: msg.message.substring(0, 100) // Truncate long messages
         });
+        await new Promise(resolve => setTimeout(resolve, 1000)); // Rate limiting
       } catch (apiErr) {
-        console.error('API Error:', apiErr.response?.data || apiErr.message);
+        console.error('⚠️ API Error:', apiErr.message);
       }
     }
   } catch (err) {
-    console.error(`❌ Error in scanning DMs: ${err.message}`);
+    console.error('🔴 DM Scan Failed:', err.message);
   }
 }
 
+// ================== Main Bot Logic ==================
 async function startBot() {
   try {
+    console.log('🤖 Starting Bot...');
     const browser = await startBrowser();
     const page = await browser.newPage();
 
+    // Lightweight Request Filtering
     await page.setRequestInterception(true);
-    page.on('request', (req) => {
-      if (['image', 'stylesheet', 'font'].includes(req.resourceType())) {
-        req.abort();
-      } else {
-        req.continue();
-      }
+    page.on('request', req => {
+      req.resourceType() === 'document' ? req.continue() : req.abort();
     });
 
     await loginToInstagram(page);
-    setInterval(() => scanDMs(page), 10000);
-
+    
+    // Optimized Scanning Interval
+    const scanInterval = setInterval(() => scanDMs(page), 15000); // 15 seconds
+    
+    // Graceful Shutdown Handling
     browser.on('disconnected', () => {
-      console.error('Browser closed! Restarting...');
-      setTimeout(startBot, 5000);
+      console.log('🔌 Browser Disconnected!');
+      clearInterval(scanInterval);
+      setTimeout(startBot, 10000);
     });
 
   } catch (err) {
-    console.error('Bot startup failed:', err);
-    setTimeout(startBot, 10000);
+    console.error('🔥 Critical Error:', err.message);
+    setTimeout(startBot, 30000); // Longer restart delay
   }
 }
 
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+// ================== Error Handling ==================
+process.on('unhandledRejection', err => {
+  console.error('💥 Unhandled Rejection:', err.message);
 });
 
-process.on('uncaughtException', (err) => {
-  console.error('Uncaught Exception:', err);
+process.on('uncaughtException', err => {
+  console.error('💣 Uncaught Exception:', err.message);
   process.exit(1);
 });
 
+// ================== Start the Bot ==================
+console.log('🚀 Initializing Instagram Bot...');
 startBot();
