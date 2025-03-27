@@ -17,19 +17,15 @@ async function startBrowser() {
     console.log("🛠️ Attempting to launch browser...");
     
     const browser = await puppeteer.launch({
-      headless: 'new',
-      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium',
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--single-process',
-        '--disable-gpu',
-        '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-        '--disable-blink-features=AutomationControlled'
-      ],
-      timeout: 120000  // 2 minutes timeout
-    });
+     headless: 'new',
+     args: [
+       '--no-sandbox',
+       '--single-process', 
+       '--disable-dev-shm-usage',
+       '--disable-gpu',
+       '--no-zygote'
+     ]
+   });
 
     console.log("✅ Browser instance created");
     const version = await browser.version();
