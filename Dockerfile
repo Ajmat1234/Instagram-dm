@@ -6,6 +6,14 @@ RUN apt-get update && apt-get install -y \
     fonts-freefont-ttf \
     xvfb \
     --no-install-recommends
+    libxss1 \
+    libgbm1 \
+    libxshmfence1 \
+    libasound2 \
+    libnss3 \
+    libatk1.0-0 \
+    libatk-bridge2.0-0 \
+    libdrm2
     
 RUN apt-get install -y \
     libxss1 \
