@@ -12,24 +12,13 @@ console.log("Chrome path:", process.env.CHROME_BIN || '/usr/bin/google-chrome-st
 
 async function startBrowser() {
   const browser = await puppeteer.launch({
-    headless: 'new', 
-    executablePath: process.env.CHROME_BIN || '/usr/bin/google-chrome-stable',
-    args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',  // ✅ Docker में memory issues के लिए जरूरी
-      '--disable-accelerated-2d-canvas',
-      '--disable-gpu',           // 🚫 Render.com पर GPU सपोर्ट नहीं
-      '--single-process',
-      '--use-gl=swiftshader',
-      '--enable-webgl',
-      '--window-size=1920,1080'  // नया फिक्स: Headless में layout issues ठीक करे
-    ],
-    env: {
-      ...process.env,
-      LIBVA_DRIVER_NAME: 'i965' 
-    }
-  });
+  executablePath: process.env.CHROME_BIN || '/usr/local/bin/chrome',
+  args: [
+    '--no-sandbox',
+    '--disable-setuid-sandbox',
+    '--disable-dev-shm-usage'
+  ]
+});
   
   // ✅ नया फिक्स: Browser version check
   const version = await browser.version();
