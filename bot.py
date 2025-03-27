@@ -13,8 +13,8 @@ WELCOME_MSGS = [
     "Hello @{username}, aapka swagat hai, enjoy kijiye!"
 ]
 TRACKING_FILE = "user_track.json"
-CHECK_INTERVAL = 120  # Increased to 2 minutes for safety
-MESSAGE_DELAY = 10    # 10 seconds gap to avoid spam detection
+CHECK_INTERVAL = random.uniform(5, 15)  # Random scan every 5-15 seconds
+MESSAGE_DELAY = random.uniform(2, 5)    # Random delay 2-5 seconds for replies
 
 # Environment Variables
 USERNAME = os.getenv("USERNAME")
@@ -40,7 +40,7 @@ def should_welcome(user_id):
     if user_id not in users:
         return True
     last_mentioned = datetime.fromisoformat(users[user_id])
-    return datetime.now() - last_mentioned > timedelta(hours=24)  # Increased to 24 hours
+    return datetime.now() - last_mentioned > timedelta(hours=24)  # 24-hour cooldown
 
 # Load session file from environment variable
 def load_session_from_env():
@@ -69,29 +69,29 @@ def handle_challenge():
 
 # Bot logic
 def forever_bot():
+    last_checked_message_id = None  # To track the latest message processed
     while True:
         try:
             print(f"\n🌀 {datetime.now().strftime('%H:%M:%S')} - Scanning...")
-            
-            threads = bot.direct_threads(amount=5)  # Reduced to 5 threads for safety
+            threads = bot.direct_threads(amount=3)  # Reduced to 3 for stealth
             for thread in threads:
                 if thread.is_group:
-                    messages = bot.direct_messages(thread_id=thread.id, amount=1)
+                    messages = bot.direct_messages(thread_id=thread.id, amount=1)  # Only latest message
                     for msg in messages:
+                        if last_checked_message_id == msg.id:
+                            continue  # Skip if already processed
                         if msg.user_id != bot.user_id and should_welcome(msg.user_id):
-                            if msg.timestamp > datetime.now() - timedelta(minutes=5):
+                            # Check if message is recent (within 1 minute)
+                            if msg.timestamp > datetime.now() - timedelta(minutes=1):
                                 username = get_username(msg.user_id)
                                 welcome_msg = random.choice(WELCOME_MSGS).format(username=username)
-
-                                bot.direct_answer(
-                                    thread_id=thread.id,
-                                    text=welcome_msg
-                                )
+                                bot.direct_answer(thread_id=thread.id, text=welcome_msg)
                                 save_user(msg.user_id, datetime.now())
                                 print(f"👋 Sent to @{username}: {welcome_msg}")
-                                time.sleep(MESSAGE_DELAY)
+                                time.sleep(MESSAGE_DELAY)  # Random delay for reply
+                        last_checked_message_id = msg.id  # Update last processed message
 
-            time.sleep(CHECK_INTERVAL)
+            time.sleep(random.uniform(5, 15))  # Random sleep to avoid detection
 
         except ChallengeRequired:
             print("🔒 Challenge detected, handling authentication...")
@@ -99,7 +99,7 @@ def forever_bot():
 
         except Exception as e:
             print(f"⚠️ Error: {str(e)}")
-            time.sleep(300)  # 5-minute delay on error to avoid rapid retries
+            time.sleep(300)  # 5-minute delay on error
 
 def get_username(user_id):
     try:
