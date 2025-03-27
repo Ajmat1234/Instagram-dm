@@ -1,12 +1,12 @@
 from instagrapi import Client
-from instagrapi.exceptions import ChallengeRequired
+from instagrapi.exceptions import ChallengeRequired, LoginRequired
 import json
 import time
 import random
 import os
 import base64
 from datetime import datetime, timedelta
-import pytz  # सही इम्पोर्ट
+import pytz
 
 # Configuration
 WELCOME_MSGS = [
@@ -14,8 +14,6 @@ WELCOME_MSGS = [
     "Hello @{username}, aapka swagat hai, enjoy kijiye!"
 ]
 TRACKING_FILE = "user_track.json"
-CHECK_INTERVAL = random.uniform(4, 10)  # Random scan every 5-15 seconds
-MESSAGE_DELAY = random.uniform(1, 3)    # Random delay 2-5 seconds for replies
 
 # Environment Variables
 USERNAME = os.getenv("USERNAME")
@@ -41,7 +39,8 @@ def should_welcome(user_id):
     if user_id not in users:
         return True
     last_mentioned = datetime.fromisoformat(users[user_id])
-    return datetime.now(pytz.utc) - last_mentioned > timedelta(hours=12)  # pytz.utc में बदला
+    # 24 घंटे का कूलडाउन सेट किया
+    return datetime.now(pytz.utc) - last_mentioned > timedelta(hours=24)
 
 # Load session file from environment variable
 def load_session_from_env():
@@ -62,45 +61,57 @@ def handle_challenge():
     challenge_url = bot.last_json.get("challenge", {}).get("api_path")
     if challenge_url:
         print(f"🔒 Challenge URL: {challenge_url}")
-        code = input("Enter code here: ")  # Manual code entry
+        code = input("Enter code here: ")
         bot.challenge_resolve(challenge_url, code)
         print("✅ Challenge resolved, re-logging in...")
         bot.login(USERNAME, PASSWORD)
         bot.dump_settings("ig_session.json")
 
+# Handle login required
+def handle_login_required():
+    print("⚠️ Login required detected, attempting to re-login...")
+    bot.login(USERNAME, PASSWORD)
+    bot.dump_settings("ig_session.json")
+    print("✅ Re-logged in successfully!")
+
 # Bot logic
 def forever_bot():
-    last_checked_message_id = None  # To track the latest message processed
+    last_checked_message_id = None
     while True:
         try:
-            print(f"\n🌀 {datetime.now(pytz.utc).strftime('%H:%M:%S')} - Scanning...")  # pytz.utc में बदला
-            threads = bot.direct_threads(amount=3)  # Reduced to 3 for stealth
+            print(f"\n🌀 {datetime.now(pytz.utc).strftime('%H:%M:%S')} - Scanning...")
+            threads = bot.direct_threads(amount=3)
             for thread in threads:
                 if thread.is_group:
-                    messages = bot.direct_messages(thread_id=thread.id, amount=1)  # Only latest message
+                    messages = bot.direct_messages(thread_id=thread.id, amount=1)
                     for msg in messages:
+                        # मैसेज पहले चेक किया हुआ है तो स्किप करें
                         if last_checked_message_id == msg.id:
-                            continue  # Skip if already processed
+                            continue
+                        last_checked_message_id = msg.id  # मैसेज ID अपडेट करें
+                        
+                        # बॉट का अपना मैसेज स्किप करें और वेलकम चेक करें
                         if msg.user_id != bot.user_id and should_welcome(msg.user_id):
-                            # Check if message is recent (within 1 minute)
-                            if msg.timestamp > datetime.now(pytz.utc) - timedelta(minutes=1):  # pytz.utc में बदला
+                            # मैसेज 1 मिनट के अंदर का होना चाहिए
+                            if msg.timestamp > datetime.now(pytz.utc) - timedelta(minutes=1):
                                 username = get_username(msg.user_id)
                                 welcome_msg = random.choice(WELCOME_MSGS).format(username=username)
                                 bot.direct_answer(thread_id=thread.id, text=welcome_msg)
-                                save_user(msg.user_id, datetime.now(pytz.utc))  # pytz.utc में बदला
+                                save_user(msg.user_id, datetime.now(pytz.utc))
                                 print(f"👋 Sent to @{username}: {welcome_msg}")
-                                time.sleep(MESSAGE_DELAY)  # Random delay for reply
-                        last_checked_message_id = msg.id  # Update last processed message
 
-            time.sleep(random.uniform(5, 15))  # Random sleep to avoid detection
+            time.sleep(0.5)  # 0.5 सेकंड का स्लीप, तेज़ लेकिन सेफ
 
         except ChallengeRequired:
             print("🔒 Challenge detected, handling authentication...")
             handle_challenge()
 
+        except LoginRequired:
+            handle_login_required()
+
         except Exception as e:
             print(f"⚠️ Error: {str(e)}")
-            time.sleep(300)  # 5-minute delay on error
+            time.sleep(60)
 
 def get_username(user_id):
     try:
@@ -115,7 +126,7 @@ def start_bot():
     bot = Client()
 
     # Rate limiting to avoid detection
-    bot.delay_range = [1, 5]  # Random delay between 1-5 seconds for requests
+    bot.delay_range = [0.5, 2]
 
     if load_session_from_env():
         try:
@@ -130,7 +141,7 @@ def start_bot():
         bot.login(USERNAME, PASSWORD)
         bot.dump_settings("ig_session.json")
 
-    print(f"🚀 Bot started: {datetime.now(pytz.utc).strftime('%d-%m-%Y %H:%M')}")  # pytz.utc में बदला
+    print(f"🚀 Bot started: {datetime.now(pytz.utc).strftime('%d-%m-%Y %H:%M')}")
     forever_bot()
 
 if __name__ == "__main__":
