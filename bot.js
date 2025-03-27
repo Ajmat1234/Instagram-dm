@@ -1,56 +1,54 @@
-const Instauto = require('instauto');
+const puppeteer = require('puppeteer');
 const axios = require('axios');
 
-// Flask API endpoint
+const INSTAGRAM_URL = 'https://www.instagram.com/';
 const FLASK_API = 'https://instagram-dm-dwuk.onrender.com/send_message';
 
-// Instagram Credentials
 const USERNAME = process.env.USERNAME;
 const PASSWORD = process.env.PASSWORD;
 
-// Instagram login
-async function loginToInstagram() {
-  const options = {
-    username: USERNAME,
-    password: PASSWORD,
-    cookiePath: './cookies.json',
-  };
-
-  const instauto = await Instauto(options);
-  console.log('✅ Instagram login successful!');
-  return instauto;
+async function loginToInstagram(page) {
+  await page.goto(INSTAGRAM_URL, { waitUntil: 'networkidle2' });
+  await page.type('input[name="username"]', USERNAME);
+  await page.type('input[name="password"]', PASSWORD);
+  await page.click('button[type="submit"]');
+  await page.waitForNavigation({ waitUntil: 'networkidle2' });
+  console.log('✅ Instagram Login Successful!');
 }
 
-// Monitor DMs for new messages
-async function monitorDMs(instauto) {
+async function scanDMs(page) {
   try {
-    const inboxFeed = await instauto.getInbox();
-    for (const thread of inboxFeed) {
-      if (thread.items.length > 0) {
-        const lastMessage = thread.items[0];
-        const userId = lastMessage.user_id;
-        const threadId = thread.thread_id;
+    await page.goto('https://www.instagram.com/direct/inbox/', { waitUntil: 'networkidle2' });
 
-        if (lastMessage.item_type === 'text') {
-          console.log(`📩 New Message from: ${userId}`);
+    const messages = await page.evaluate(() => {
+      const threads = document.querySelectorAll('._abx5');
+      const msgArray = [];
+      threads.forEach(thread => {
+        const username = thread.querySelector('._ap3a').innerText;
+        const message = thread.querySelector('._a9-z span').innerText;
+        msgArray.push({ username, message });
+      });
+      return msgArray;
+    });
 
-          // Send to Flask for processing
-          await axios.post(FLASK_API, {
-            user_id: userId,
-            thread_id: threadId,
-          });
-        }
-      }
+    for (const msg of messages) {
+      console.log(`📩 New Message from: ${msg.username} - ${msg.message}`);
+      await axios.post(FLASK_API, {
+        user_id: msg.username,
+        message: msg.message,
+      });
     }
   } catch (err) {
-    console.error(`❌ Error in monitoring DMs: ${err.message}`);
+    console.error(`❌ Error in scanning DMs: ${err.message}`);
   }
 }
 
-// Start the bot
 async function startBot() {
-  const instauto = await loginToInstagram();
-  setInterval(() => monitorDMs(instauto), 5000); // Check every 5 seconds
+  const browser = await puppeteer.launch({ headless: false }); // Headless ko false karo for debugging
+  const page = await browser.newPage();
+
+  await loginToInstagram(page);
+  setInterval(() => scanDMs(page), 5000); // Check every 5 seconds
 }
 
 startBot();
