@@ -1,6 +1,6 @@
 FROM node:20
 
-# ================= System Dependencies =================
+# System dependencies
 RUN apt-get update && apt-get install -y \
     wget \
     xvfb \
@@ -13,23 +13,26 @@ RUN apt-get update && apt-get install -y \
     fonts-freefont-ttf \
     && rm -rf /var/lib/apt/lists/*
 
-# ================= Chrome Install =================
+# Install Chrome
 RUN wget -q https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb \
     && dpkg -x google-chrome-stable_current_amd64.deb /tmp/chrome \
     && mv /tmp/chrome/opt/google/chrome/chrome /usr/bin/google-chrome-stable \
     && rm -rf /tmp/chrome google-chrome-stable_current_amd64.deb
 
-# ================= PM2 Setup =================
+# PM2 Setup
 ENV NPM_CONFIG_PREFIX=/home/node/.npm-global
 ENV PATH=$PATH:/home/node/.npm-global/bin
 RUN npm install -g pm2@latest --unsafe-perm
 
-# ================= App Setup =================
-USER node
+# App Setup
 WORKDIR /app
-COPY --chown=node:node package*.json ./
+COPY package*.json .
 RUN npm install --production
-COPY --chown=node:node . .
+COPY . .
 
-# ================= Final Run =================
-CMD ["sh", "-c", "Xvfb :99 -screen 0 1024x768x24 & pm2-runtime ecosystem.config.js"]
+# Permissions
+USER node
+RUN chmod 755 /usr/bin/google-chrome-stable
+
+# Startup Command
+CMD ["sh", "-c", "Xvfb :99 -screen 0 1024x768x24 & /home/node/.npm-global/bin/pm2-runtime ecosystem.config.js"]
