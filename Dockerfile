@@ -1,4 +1,4 @@
-FROM node:20-bullseye # Debian-based for Chrome compatibility
+FROM node:20-bullseye
 
 # ==================== Chrome Installation ====================
 # Official Google Chrome installation (Latest stable)
