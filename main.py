@@ -107,11 +107,9 @@ def send_message():
         return {"status": "skipped", "message": "User already welcomed"}
 
 # Flask endpoint to manually reset session
-@app.route("/reset_session", methods=["POST"])
-def reset_session():
-    """Manually reset session and update SESSION_DATA"""
-    auto_login_and_save()
-    return {"status": "success", "message": "Session reset and updated successfully."}
+@app.route("/", methods=["GET"])
+def home():
+    return {"status": "success", "message": "Bot is running perfectly!"}
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
