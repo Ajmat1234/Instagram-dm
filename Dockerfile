@@ -15,6 +15,8 @@ RUN pip3 install -r requirements.txt
 # --------- Node Setup ---------
 COPY package*.json .
 RUN npm install --production
+# Dockerfile में ये लाइन जोड़ें
+RUN echo "PORT Value: $PORT"  # Build logs में पोर्ट वैल्यू चेक करें
 
 # --------- App Copy ---------
 COPY . .
