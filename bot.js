@@ -6,47 +6,40 @@ const FLASK_API = process.env.FLASK_API || 'http://0.0.0.0:10000/send_message';
 const USERNAME = process.env.USERNAME;
 const PASSWORD = process.env.PASSWORD;
 
-// Launch Browser
-async function startBrowser() {
-  const browser = await chromium.launch({ headless: true });
-  return browser;
-}
-
-// Login to Instagram
-async function loginToInstagram(page) {
-  await page.goto(`${INSTAGRAM_URL}accounts/login/`);
-  await page.fill('input[name="username"]', USERNAME);
-  await page.fill('input[name="password"]', PASSWORD);
-  await Promise.all([
-    page.waitForNavigation({ waitUntil: 'networkidle' }),
-    page.click('button[type="submit"]')
-  ]);
-}
-
-// DM Scanning and API Integration
-async function scanDMs(page) {
-  await page.goto(`${INSTAGRAM_URL}direct/inbox/`);
-  const messages = await page.$$eval('div[role="grid"]', chats =>
-    chats.map(chat => {
-      const username = chat.querySelector('span._ap3a')?.innerText;
-      const message = chat.querySelector('div._aacl._aaco')?.innerText;
-      return { username, message };
-    })
-  );
-  for (const msg of messages) {
-    await axios.post(FLASK_API, { user_id: msg.username, message: msg.message });
-  }
-}
-
-// Main Bot Flow
 async function startBot() {
-  const browser = await startBrowser();
-  const context = await browser.newContext();
-  const page = await context.newPage();
-  await loginToInstagram(page);
+    console.log('🚀 Starting Instagram Bot with Playwright');
 
-  // Periodic Scanning Every 30 Seconds
-  setInterval(() => scanDMs(page), 30000);
+    const browser = await chromium.launch({ headless: true });
+    const page = await browser.newPage();
+    await page.goto(INSTAGRAM_URL);
+
+    // Login Process
+    await page.fill('input[name="username"]', USERNAME);
+    await page.fill('input[name="password"]', PASSWORD);
+    await page.click('button[type="submit"]');
+    await page.waitForSelector('svg[aria-label="Home"]');
+
+    console.log('✅ Logged into Instagram!');
+
+    // DM Scanning Loop
+    while (true) {
+        await page.goto('https://www.instagram.com/direct/inbox/');
+        await page.waitForTimeout(30000);
+
+        const messages = await page.evaluate(() => {
+            return Array.from(document.querySelectorAll('div[role="row"]')).map(chat => {
+                const username = chat.innerText.split('\n')[0];
+                return { username };
+            });
+        });
+
+        for (const msg of messages) {
+            console.log(`📩 Checking DM from: ${msg.username}`);
+            await axios.post(FLASK_API, { user_id: msg.username });
+        }
+
+        await page.waitForTimeout(30000);
+    }
 }
 
-startBot().catch(err => console.error('❌ Bot Error:', err));
+startBot().catch(console.error);
