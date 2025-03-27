@@ -9,22 +9,23 @@ const PASSWORD = process.env.PASSWORD;
 
 async function startBrowser() {
   const browser = await puppeteer.launch({
-    headless: "new", // या 'shell' ट्राई करें
-    executablePath: process.env.CHROME_BIN || "/usr/bin/google-chrome-stable",
-    args: [
-      "--no-sandbox",
-      "--disable-setuid-sandbox",
-      "--disable-dev-shm-usage",
-      "--disable-gpu",
-      "--single-process",
-      "--disable-accelerated-2d-canvas",
-      "--disable-features=HttpsFirstBalancedModeAutoEnable"
-    ],
-    env: {
-      ...process.env,
-      CHROME_DEVEL_SANDBOX: "/usr/local/sbin/chrome-devel-sandbox"
-    }
-  });
+  headless: 'new', // Must use new headless mode
+  executablePath: process.env.CHROME_BIN || '/usr/bin/google-chrome-stable',
+  args: [
+    '--no-sandbox',
+    '--disable-setuid-sandbox',
+    '--disable-dev-shm-usage',
+    '--disable-accelerated-2d-canvas',
+    '--disable-gpu',
+    '--single-process',
+    '--use-gl=swiftshader',
+    '--enable-webgl'
+  ],
+  env: {
+    ...process.env,
+    LIBVA_DRIVER_NAME: 'i965' // Critical for GPU acceleration
+  }
+});
   return browser;
 }
 // 🟢 Instagram Login
