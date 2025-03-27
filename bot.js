@@ -7,6 +7,24 @@ const FLASK_API = 'https://instagram-dm-dwuk.onrender.com/send_message';
 const USERNAME = process.env.USERNAME;
 const PASSWORD = process.env.PASSWORD;
 
+// 🟢 Start Browser with optimized args
+async function startBrowser() {
+  const browser = await puppeteer.launch({
+    headless: true, // Headless mode for production
+    args: [
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-dev-shm-usage",
+      "--disable-gpu",
+      "--no-zygote",
+      "--single-process"
+    ],
+    executablePath: process.env.CHROME_BIN || puppeteer.executablePath(),
+  });
+  return browser;
+}
+
+// 🟢 Instagram Login
 async function loginToInstagram(page) {
   await page.goto(INSTAGRAM_URL, { waitUntil: 'networkidle2' });
   await page.type('input[name="username"]', USERNAME);
@@ -16,6 +34,7 @@ async function loginToInstagram(page) {
   console.log('✅ Instagram Login Successful!');
 }
 
+// 🟢 Scan DMs
 async function scanDMs(page) {
   try {
     await page.goto('https://www.instagram.com/direct/inbox/', { waitUntil: 'networkidle2' });
@@ -43,8 +62,9 @@ async function scanDMs(page) {
   }
 }
 
+// 🟢 Start Bot
 async function startBot() {
-  const browser = await puppeteer.launch({ headless: false }); // Headless ko false karo for debugging
+  const browser = await startBrowser(); // Use startBrowser() here
   const page = await browser.newPage();
 
   await loginToInstagram(page);
