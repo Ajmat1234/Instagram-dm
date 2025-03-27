@@ -7,22 +7,26 @@ const FLASK_API = 'https://instagram-dm-dwuk.onrender.com/send_message';
 const USERNAME = process.env.USERNAME;
 const PASSWORD = process.env.PASSWORD;
 
-// 🟢 Start Browser with correct path
 async function startBrowser() {
   const browser = await puppeteer.launch({
-    headless: "new",
+    headless: "new", // या 'shell' ट्राई करें
+    executablePath: process.env.CHROME_BIN || "/usr/bin/google-chrome-stable",
     args: [
       "--no-sandbox",
       "--disable-setuid-sandbox",
       "--disable-dev-shm-usage",
       "--disable-gpu",
-      "--single-process"
+      "--single-process",
+      "--disable-accelerated-2d-canvas",
+      "--disable-features=HttpsFirstBalancedModeAutoEnable"
     ],
-    executablePath: process.env.CHROME_BIN || "/usr/bin/google-chrome-stable"
+    env: {
+      ...process.env,
+      CHROME_DEVEL_SANDBOX: "/usr/local/sbin/chrome-devel-sandbox"
+    }
   });
   return browser;
 }
-
 // 🟢 Instagram Login
 async function loginToInstagram(page) {
   await page.goto(INSTAGRAM_URL, { waitUntil: 'networkidle2' });
