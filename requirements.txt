@@ -1,6 +1,6 @@
 instagrapi==1.19.5
 requests==2.31.0
-pydantic==1.10.7
+pydantic==1.10.9
 pycryptodomex==3.17
 python-dotenv==1.0.0
 pillow==9.0.1
