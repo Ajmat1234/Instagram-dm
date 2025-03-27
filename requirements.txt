@@ -1,1 +1,5 @@
-instaloader==4.10.3
+instagrapi==2.0.0
+requests==2.31.0
+pydantic==2.6.4
+pycryptodomex==3.20.0
+python-dotenv==1.0.1
