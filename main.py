@@ -95,10 +95,9 @@ def send_message():
     else:
         return {"status": "skipped", "message": "User already welcomed"}
 
-@app.route("/", methods=["GET"])
+@app.route('/')
 def home():
-    return {"status": "success", "message": "Bot is running perfectly!"}
-
+    return "Bot is running successfully!"
 if __name__ == "__main__":
        port = int(os.environ.get("PORT", 10000))  # Default 10000
        app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 10000)))
