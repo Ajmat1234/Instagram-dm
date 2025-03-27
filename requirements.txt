@@ -3,3 +3,4 @@ instagrapi
 pytz
 playwright
 gunicorn
+Pillow
