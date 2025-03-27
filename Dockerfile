@@ -6,6 +6,13 @@ RUN apt-get update && apt-get install -y \
     fonts-freefont-ttf \
     xvfb \
     --no-install-recommends
+    
+RUN apt-get install -y \
+    libxss1 \
+    libgbm1 \
+    libxshmfence1 \
+    libasound2 \
+    libnss3
 
 # --------- Python Setup (Flask के लिए) ---------
 RUN apt-get install -y python3 python3-pip
