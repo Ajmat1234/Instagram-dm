@@ -1,5 +1,5 @@
 services:
-  - name: instagram-dm-bot
+  - name: instagram-dm
     env: node
     buildCommand: npm install
     startCommand: node bot.js
