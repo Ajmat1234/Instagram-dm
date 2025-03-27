@@ -1,8 +1,7 @@
-FROM node:20-bullseye # Slim image नहीं
+FROM node:20
 
 # ================= System Dependencies =================
-RUN apt-get update -o Acquire::CheckValid-Until=false \
-    && apt-get install -y --no-install-recommends \
+RUN apt-get update && apt-get install -y \
     wget \
     xvfb \
     libgl1 \
@@ -14,27 +13,23 @@ RUN apt-get update -o Acquire::CheckValid-Until=false \
     fonts-freefont-ttf \
     && rm -rf /var/lib/apt/lists/*
 
-# ================= Chrome Installation =================
+# ================= Chrome Install =================
 RUN wget -q https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb \
     && dpkg -x google-chrome-stable_current_amd64.deb /tmp/chrome \
     && mv /tmp/chrome/opt/google/chrome/chrome /usr/bin/google-chrome-stable \
     && rm -rf /tmp/chrome google-chrome-stable_current_amd64.deb
 
 # ================= PM2 Setup =================
-RUN npm install -g pm2@latest --unsafe-perm --scripts-prepend-node-path=true
-ENV PATH="/usr/local/bin:${PATH}"
+ENV NPM_CONFIG_PREFIX=/home/node/.npm-global
+ENV PATH=$PATH:/home/node/.npm-global/bin
+RUN npm install -g pm2@latest --unsafe-perm
 
 # ================= App Setup =================
+USER node
 WORKDIR /app
-COPY package*.json .
+COPY --chown=node:node package*.json ./
 RUN npm install --production
-COPY . .
+COPY --chown=node:node . .
 
-# ================= Permissions =================
-RUN chmod 755 /usr/bin/google-chrome-stable
-
-# ================= Startup Script =================
-RUN echo '#!/bin/sh\nXvfb :99 -screen 0 1024x768x24 &\nexec pm2-runtime ecosystem.config.js' > /start.sh \
-    && chmod +x /start.sh
-
-CMD ["/start.sh"]
+# ================= Final Run =================
+CMD ["sh", "-c", "Xvfb :99 -screen 0 1024x768x24 & pm2-runtime ecosystem.config.js"]
