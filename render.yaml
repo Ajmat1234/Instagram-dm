@@ -1,0 +1,12 @@
+services:
+  - name: instagram-dm-bot
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn main:app --bind 0.0.0.0:5000
+    envVars:
+      - key: USERNAME
+        sync: false
+      - key: PASSWORD
+        sync: false
+      - key: SESSION_DATA
+        sync: false
