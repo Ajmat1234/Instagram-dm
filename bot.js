@@ -2,7 +2,7 @@ const puppeteer = require('puppeteer-core');
 const axios = require('axios');
 
 const INSTAGRAM_URL = 'https://www.instagram.com/';
-const FLASK_API = process.env.FLASK_API || 'http://localhost:10000/send_message';
+const FLASK_API = process.env.FLASK_API || 'http://0.0.0.0:10000/send_message';
 const USERNAME = process.env.USERNAME;
 const PASSWORD = process.env.PASSWORD;
 
