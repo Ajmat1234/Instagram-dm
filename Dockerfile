@@ -21,5 +21,4 @@ COPY . .
 
 # --------- Run Command ---------
 # गलत:
-CMD ["sh", "-c", "Xvfb :99 ... & gunicorn main:app -b 0.0.0.0:$PORT"]
-   # $PORT ठीक से पास नहीं हो रहा
+CMD ["sh", "-c", "Xvfb :99 -screen 0 1024x768x24 & gunicorn main:app -b 0.0.0.0:${PORT} & node bot.js"]
