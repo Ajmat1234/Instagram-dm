@@ -10,14 +10,17 @@ const PASSWORD = process.env.PASSWORD;
 console.log("Chrome path:", process.env.CHROME_BIN || '/usr/bin/google-chrome-stable');
 
 async function startBrowser() {
-  const browser = await puppeteer.launch({
-    executablePath: process.env.CHROME_BIN || '/usr/local/bin/chrome',
-    args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage'
-    ]
-  });
+  // bot.js में ये बदलाव करें
+const browser = await puppeteer.launch({
+  headless: 'new',
+  executablePath: '/usr/bin/chromium',
+  args: [
+    '--no-sandbox',
+    '--disable-setuid-sandbox',
+    '--disable-dev-shm-usage',
+    '--single-process'
+  ]
+});
 
   const version = await browser.version();
   console.log(`Browser launched: ${version}`);
