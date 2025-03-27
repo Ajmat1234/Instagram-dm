@@ -1,4 +1,4 @@
-const { IgApiClient } = require('instagram-private-api');
+const { IgApiClient } = require('instauto');
 const axios = require('axios');
 
 const ig = new IgApiClient();
