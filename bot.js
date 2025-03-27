@@ -1,4 +1,4 @@
-const puppeteer = require('puppeteer');
+const puppeteer = require('puppeteer-core');
 const axios = require('axios');
 
 const INSTAGRAM_URL = 'https://www.instagram.com/';
@@ -10,7 +10,7 @@ const PASSWORD = process.env.PASSWORD;
 // 🟢 Start Browser with correct path
 async function startBrowser() {
   const browser = await puppeteer.launch({
-    headless: 'new', // New Headless mode for Chrome
+    headless: 'new', // Use new headless mode
     args: [
       "--no-sandbox",
       "--disable-setuid-sandbox",
@@ -19,7 +19,7 @@ async function startBrowser() {
       "--no-zygote",
       "--single-process"
     ],
-    executablePath: process.env.CHROME_BIN || "/usr/bin/google-chrome-stable",
+    executablePath: '/usr/bin/google-chrome-stable', // Manually installed Chrome path
   });
 
   return browser;
