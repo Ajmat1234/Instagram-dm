@@ -1,29 +1,31 @@
-const { IgApiClient } = require('instauto');
+const Instauto = require('instauto');
 const axios = require('axios');
 
-const ig = new IgApiClient();
+// Flask API endpoint
+const FLASK_API = 'https://instagram-dm-dwuk.onrender.com/send_message';
 
 // Instagram Credentials
 const USERNAME = process.env.USERNAME;
 const PASSWORD = process.env.PASSWORD;
 
-// Flask API endpoint
-const FLASK_API = 'https://instagram-dm-dwuk.onrender.com/send_message';
-
 // Instagram login
 async function loginToInstagram() {
-  ig.state.generateDevice(USERNAME);
-  await ig.account.login(USERNAME, PASSWORD);
+  const options = {
+    username: USERNAME,
+    password: PASSWORD,
+    cookiePath: './cookies.json',
+  };
+
+  const instauto = await Instauto(options);
   console.log('✅ Instagram login successful!');
+  return instauto;
 }
 
 // Monitor DMs for new messages
-async function monitorDMs() {
+async function monitorDMs(instauto) {
   try {
-    const inboxFeed = ig.feed.directInbox();
-    const threads = await inboxFeed.items();
-
-    for (const thread of threads) {
+    const inboxFeed = await instauto.getInbox();
+    for (const thread of inboxFeed) {
       if (thread.items.length > 0) {
         const lastMessage = thread.items[0];
         const userId = lastMessage.user_id;
@@ -47,8 +49,8 @@ async function monitorDMs() {
 
 // Start the bot
 async function startBot() {
-  await loginToInstagram();
-  setInterval(monitorDMs, 5000); // Check every 5 seconds
+  const instauto = await loginToInstagram();
+  setInterval(() => monitorDMs(instauto), 5000); // Check every 5 seconds
 }
 
 startBot();
