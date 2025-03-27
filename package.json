@@ -9,7 +9,10 @@
     "axios": "^0.27.2",
     "puppeteer": "^21.3.8"
   },
+  "puppeteer": {
+    "executablePath": "/usr/bin/google-chrome-stable"
+  },
   "engines": {
-    "node": ">=18.0.0"  // Yahan bun ko mention mat karo
+    "node": ">=18.0.0"
   }
 }
