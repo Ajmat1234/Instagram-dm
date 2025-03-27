@@ -7,10 +7,10 @@ const FLASK_API = 'https://instagram-dm-dwuk.onrender.com/send_message';
 const USERNAME = process.env.USERNAME;
 const PASSWORD = process.env.PASSWORD;
 
-// 🟢 Start Browser with optimized args
+// 🟢 Start Browser with correct path
 async function startBrowser() {
   const browser = await puppeteer.launch({
-    headless: true, // Headless mode for production
+    headless: 'new', // New Headless mode for Chrome
     args: [
       "--no-sandbox",
       "--disable-setuid-sandbox",
@@ -19,8 +19,9 @@ async function startBrowser() {
       "--no-zygote",
       "--single-process"
     ],
-    executablePath: process.env.CHROME_BIN || puppeteer.executablePath(),
+    executablePath: process.env.CHROME_BIN || "/usr/bin/google-chrome-stable",
   });
+
   return browser;
 }
 
