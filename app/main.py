@@ -4,6 +4,7 @@ import json
 from datetime import datetime, timedelta
 import pytz
 import os
+import base64
 
 app = Flask(__name__)
 
@@ -13,7 +14,6 @@ WELCOME_MSGS = [
     "Hello @{username}, aapka swagat hai, enjoy kijiye!"
 ]
 TRACKING_FILE = "user_track.json"
-SESSION_FILE = "/var/data/ig_session.json"
 
 # User tracking system
 def load_users():
@@ -43,12 +43,41 @@ USERNAME = os.getenv("USERNAME")
 PASSWORD = os.getenv("PASSWORD")
 SESSION_DATA = os.getenv("SESSION_DATA")
 
-# Load session if available
-if os.path.exists(SESSION_FILE):
-    bot.load_settings(SESSION_FILE)
-else:
+def save_session_to_env():
+    """Session ko base64 me encode karke environment variable me save karega"""
+    with open("ig_session.json", "rb") as f:
+        session_data = base64.b64encode(f.read()).decode()
+    os.environ["SESSION_DATA"] = session_data
+    print("✅ Session updated successfully in environment variable!")
+
+def load_or_login():
+    """Agar SESSION_DATA valid hai to load karega, warna login karke naya session save karega"""
+    if SESSION_DATA:
+        try:
+            # Decode session data from base64
+            session_bytes = base64.b64decode(SESSION_DATA)
+            with open("ig_session.json", "wb") as f:
+                f.write(session_bytes)
+
+            # Load session from ig_session.json
+            bot.load_settings("ig_session.json")
+            print("✅ Session restored from environment variable.")
+        except Exception as e:
+            print(f"⚠️ Error loading session: {e}, logging in again...")
+            auto_login_and_save()
+    else:
+        print("⚠️ No session found. Logging in...")
+        auto_login_and_save()
+
+def auto_login_and_save():
+    """Agar session fail ho jaye to auto-login karke naya session save karega"""
     bot.login(username=USERNAME, password=PASSWORD)
-    bot.dump_settings(SESSION_FILE)
+    bot.dump_settings("ig_session.json")
+    save_session_to_env()
+    print("✅ New session created and saved to environment variable!")
+
+# Load or login at startup
+load_or_login()
 
 def get_username(user_id):
     try:
@@ -76,6 +105,13 @@ def send_message():
         return {"status": "success", "message": f"Sent to {username}"}
     else:
         return {"status": "skipped", "message": "User already welcomed"}
+
+# Flask endpoint to manually reset session
+@app.route("/reset_session", methods=["POST"])
+def reset_session():
+    """Manually reset session and update SESSION_DATA"""
+    auto_login_and_save()
+    return {"status": "success", "message": "Session reset and updated successfully."}
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
