@@ -1,4 +1,3 @@
-// ecosystem.config.js
 module.exports = {
   apps: [
     {
@@ -11,6 +10,9 @@ module.exports = {
       name: "NodeBot",
       script: "bot.js",
       interpreter: "node",
-    },
-  ],
+      env: {
+        CHROME_BIN: "/usr/bin/google-chrome-stable"
+      }
+    }
+  ]
 };
