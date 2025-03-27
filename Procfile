@@ -1,2 +1,1 @@
-web: gunicorn main:app --bind 0.0.0.0:$PORT
-worker: node bot.js
+web: sh -c "gunicorn main:app --bind 0.0.0.0:$PORT & node bot.js"
