@@ -1,8 +1,8 @@
 services:
   - name: instagram-dm-bot
     env: python
-    buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn main:app --bind 0.0.0.0:5000
+    buildCommand: pip install -r requirements.txt && npm install
+    startCommand: gunicorn main:app --bind 0.0.0.0:5000 & node bot.js
     envVars:
       - key: USERNAME
         sync: false
