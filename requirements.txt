@@ -6,3 +6,4 @@ python-dotenv==1.0.0
 pillow==9.0.1
 urllib3==2.2.1
 certifi==2024.2.2
+pytz==2024.1
