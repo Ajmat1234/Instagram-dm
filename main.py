@@ -1,19 +1,28 @@
+from flask import Flask, request, jsonify
 from instagrapi import Client
-from flask import Flask, request
+from playwright.sync_api import sync_playwright
 import json
-from datetime import datetime, timedelta
-import pytz
 import os
 import base64
+import random
+import threading
+from datetime import datetime, timedelta
+import pytz
 
 app = Flask(__name__)
 
+# ---------------- Config and Environment ----------------
 WELCOME_MSGS = [
     "Welcome @{username}, humein khushi hai ki aap hamare group mein shamil hue!",
     "Hello @{username}, aapka swagat hai, enjoy kijiye!"
 ]
 TRACKING_FILE = "user_track.json"
 
+USERNAME = os.getenv("USERNAME")
+PASSWORD = os.getenv("PASSWORD")
+SESSION_DATA = os.getenv("SESSION_DATA")
+
+# ---------------- User Tracking ----------------
 def load_users():
     try:
         with open(TRACKING_FILE, "r") as f:
@@ -34,19 +43,9 @@ def should_welcome(user_id):
     last_mentioned = datetime.fromisoformat(users[user_id])
     return datetime.now(pytz.utc) - last_mentioned > timedelta(hours=24)
 
-bot = Client()
-
-USERNAME = os.getenv("USERNAME")
-PASSWORD = os.getenv("PASSWORD")
-SESSION_DATA = os.getenv("SESSION_DATA")
-
-def save_session_to_env():
-    with open("ig_session.json", "rb") as f:
-        session_data = base64.b64encode(f.read()).decode()
-    os.environ["SESSION_DATA"] = session_data
-    print("✅ Session updated successfully in environment variable!")
-
+# ---------------- Session Management ----------------
 def load_or_login():
+    bot = Client()
     if SESSION_DATA:
         try:
             session_bytes = base64.b64decode(SESSION_DATA)
@@ -56,48 +55,78 @@ def load_or_login():
             print("✅ Session restored from environment variable.")
         except Exception as e:
             print(f"⚠️ Error loading session: {e}, logging in again...")
-            auto_login_and_save()
+            bot.login(username=USERNAME, password=PASSWORD)
     else:
         print("⚠️ No session found. Logging in...")
-        auto_login_and_save()
+        bot.login(username=USERNAME, password=PASSWORD)
+    return bot
 
-def auto_login_and_save():
-    bot.login(username=USERNAME, password=PASSWORD)
-    bot.dump_settings("ig_session.json")
-    save_session_to_env()
-    print("✅ New session created and saved to environment variable!")
+bot = load_or_login()
 
-load_or_login()
+# ---------------- Playwright Monitoring ----------------
+def monitor_dms():
+    """Real-time DM Monitoring with Playwright"""
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
+        
+        # Login to Instagram
+        page.goto("https://www.instagram.com/accounts/login/")
+        page.fill('input[name="username"]', USERNAME)
+        page.fill('input[name="password"]', PASSWORD)
+        page.click('button[type="submit"]')
+        page.wait_for_selector('svg[aria-label="Home"]')
+
+        # Navigate to DM Inbox
+        page.goto('https://www.instagram.com/direct/inbox/')
+        page.wait_for_selector('div[role="grid"]')
+        
+        print("📡 Monitoring DMs...")
+        while True:
+            page.reload(wait_until="networkidle")
+            dms = page.locator('div[role="grid"]').all_inner_texts()
+            for dm in dms:
+                if "New message" in dm:
+                    handle_new_dm(dm)
+            page.wait_for_timeout(10000)  # Wait for 10 seconds before checking again
+
+def handle_new_dm(dm):
+    """Handle New DM and Send Auto-response"""
+    user_id = dm.split()[0]
+    if should_welcome(user_id):
+        username = get_username(user_id)
+        welcome_msg = random.choice(WELCOME_MSGS).format(username=username)
+        bot.direct_answer(thread_id=user_id, text=welcome_msg)
+        save_user(user_id, datetime.now(pytz.utc))
+        print(f"👋 Sent to @{username}: {welcome_msg}")
 
 def get_username(user_id):
+    """Get Username from User ID"""
     try:
         user = bot.user_info(user_id)
         return user.username
     except Exception:
         return "user"
 
-@app.route("/send_message", methods=["POST"])
-def send_message():
-    data = request.json
-    user_id = data.get("user_id")
-    thread_id = data.get("thread_id")
-
-    if not user_id or not thread_id:
-        return {"status": "error", "message": "Missing user_id or thread_id"}
-
-    if should_welcome(user_id):
-        username = get_username(user_id)
-        welcome_msg = random.choice(WELCOME_MSGS).format(username=username)
-        bot.direct_answer(thread_id=thread_id, text=welcome_msg)
-        save_user(user_id, datetime.now(pytz.utc))
-        print(f"👋 Sent to @{username}: {welcome_msg}")
-        return {"status": "success", "message": f"Sent to {username}"}
-    else:
-        return {"status": "skipped", "message": "User already welcomed"}
-
+# ---------------- Flask Endpoints ----------------
 @app.route('/')
 def home():
-    return "Bot is running successfully!"
+    """Health Check Endpoint"""
+    return jsonify({"status": "Bot is running", "message": "DM monitoring active!"})
+
+@app.route('/start_monitoring', methods=["POST"])
+def start_monitoring():
+    """Start DM Monitoring"""
+    thread = threading.Thread(target=monitor_dms)
+    thread.start()
+    return jsonify({"status": "success", "message": "DM Monitoring started"})
+
+@app.route('/stop_monitoring', methods=["POST"])
+def stop_monitoring():
+    """Stop DM Monitoring"""
+    # Stopping threads in Python is tricky, better to kill manually for now
+    return jsonify({"status": "error", "message": "Stopping monitoring manually is advised"})
+
 if __name__ == "__main__":
-       port = int(os.environ.get("PORT", 10000))  # Default 10000
-       app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 10000)))
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
