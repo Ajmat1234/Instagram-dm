@@ -1,4 +1,5 @@
 flask
 instagrapi
-playwright
 pytz
+playwright
+gunicorn
