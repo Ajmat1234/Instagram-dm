@@ -8,20 +8,19 @@ const USERNAME = process.env.USERNAME;
 const PASSWORD = process.env.PASSWORD;
 
 // 🟢 Start Browser with correct path
+// bot.js में बदलाव
 async function startBrowser() {
   const browser = await puppeteer.launch({
-    headless: 'new', // Use new headless mode
+    headless: "new",
     args: [
       "--no-sandbox",
       "--disable-setuid-sandbox",
       "--disable-dev-shm-usage",
       "--disable-gpu",
-      "--no-zygote",
-      "--single-process"
+      "--single-process",
     ],
-    executablePath: '/usr/bin/google-chrome-stable', // Manually installed Chrome path
+    executablePath: process.env.CHROME_BIN || "/usr/bin/google-chrome-stable",
   });
-
   return browser;
 }
 
