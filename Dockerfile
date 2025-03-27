@@ -20,4 +20,4 @@ RUN npm install --production
 COPY . .
 
 # --------- Run Command ---------
-CMD ["sh", "-c", "Xvfb :99 -screen 0 1024x768x24 & node bot.js & gunicorn main:app -b 0.0.0.0:$PORT"]
+CMD ["sh", "-c", "Xvfb :99 -screen 0 1024x768x24 & node bot.js & gunicorn main:app -b 0.0.0.0:${PORT}"]
