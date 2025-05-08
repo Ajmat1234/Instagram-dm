@@ -8,6 +8,14 @@ import time
 import threading
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+import nltk
+from nltk.tokenize import word_tokenize
+from nltk.corpus import stopwords
+import string
+
+# Download NLTK data
+nltk.download('punkt')
+nltk.download('stopwords')
 
 # Flask app
 app = Flask(__name__)
@@ -77,6 +85,80 @@ def get_topics():
             "topics": []
         }), 500
 
+# New endpoint to delete duplicate topics
+@app.route('/delete-duplicates', methods=['GET'])
+def delete_duplicates():
+    try:
+        conn = mysql.connector.connect(**db_config)
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("SELECT id, title, added_at FROM topics ORDER BY added_at DESC")
+        topics = cursor.fetchall()
+        
+        if not topics:
+            cursor.close()
+            conn.close()
+            return jsonify({
+                "status": "success",
+                "message": "No topics found in the database.",
+                "deleted_count": 0
+            })
+
+        # Extract titles and IDs
+        titles = [topic['title'] for topic in topics]
+        topic_ids = [topic['id'] for topic in topics]
+        added_at_timestamps = [topic['added_at'] for topic in topics]
+
+        # Compute similarity matrix
+        vectorizer = TfidfVectorizer()
+        tfidf_matrix = vectorizer.fit_transform(titles)
+        similarity_matrix = cosine_similarity(tfidf_matrix, tfidf_matrix)
+
+        # Find duplicates (similarity > 0.7)
+        to_delete = set()
+        for i in range(len(titles)):
+            if i in to_delete:
+                continue
+            for j in range(i + 1, len(titles)):
+                if similarity_matrix[i][j] > 0.7:
+                    # Keep the topic with the latest timestamp
+                    if added_at_timestamps[i] > added_at_timestamps[j]:
+                        to_delete.add(j)
+                    else:
+                        to_delete.add(i)
+
+        # Delete duplicate topics
+        deleted_count = 0
+        for idx in to_delete:
+            cursor.execute("DELETE FROM topics WHERE id = %s", (topic_ids[idx],))
+            print(f"[{datetime.now()}] Deleted duplicate topic ID {topic_ids[idx]}: {titles[idx]}")
+            deleted_count += 1
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        return jsonify({
+            "status": "success",
+            "message": f"Deleted {deleted_count} duplicate topics.",
+            "deleted_count": deleted_count
+        })
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": f"Error deleting duplicates: {str(e)}",
+            "deleted_count": 0
+        }), 500
+
+def extract_keywords(text):
+    """
+    Extract keywords from text for better duplicate detection.
+    """
+    stop_words = set(stopwords.words('english'))
+    tokens = word_tokenize(text.lower())
+    # Remove punctuation and stopwords
+    keywords = [word for word in tokens if word not in string.punctuation and word not in stop_words]
+    return set(keywords)
+
 def insert_topic(topic):
     try:
         conn = mysql.connector.connect(**db_config)
@@ -92,18 +174,32 @@ def insert_topic(topic):
         cursor.execute("SELECT title FROM topics")
         existing_topics = [row[0] for row in cursor.fetchall()]
         
-        # Check similarity with existing topics
+        # Double check for duplicates
         if existing_topics:
+            # TF-IDF based similarity check
             vectorizer = TfidfVectorizer()
             all_texts = existing_topics + [topic]
             tfidf_matrix = vectorizer.fit_transform(all_texts)
             similarity_matrix = cosine_similarity(tfidf_matrix[-1], tfidf_matrix[:-1])
             max_similarity = similarity_matrix.max()
             if max_similarity > 0.7:
-                print(f"[{datetime.now()}] Topic too similar to existing (similarity: {max_similarity}): {topic}")
+                print(f"[{datetime.now()}] Topic too similar to existing (TF-IDF similarity: {max_similarity}): {topic}")
                 cursor.close()
                 conn.close()
                 return False
+            
+            # Keyword overlap check
+            topic_keywords = extract_keywords(topic)
+            for existing_topic in existing_topics:
+                existing_keywords = extract_keywords(existing_topic)
+                # Calculate keyword overlap
+                common_keywords = topic_keywords.intersection(existing_keywords)
+                overlap_ratio = len(common_keywords) / max(len(topic_keywords), len(existing_keywords))
+                if overlap_ratio > 0.6:
+                    print(f"[{datetime.now()}] Topic too similar to existing (keyword overlap: {overlap_ratio}): {topic}")
+                    cursor.close()
+                    conn.close()
+                    return False
         
         # Insert if not similar
         cursor.execute("INSERT INTO topics (title) VALUES (%s)", (topic,))
@@ -121,13 +217,17 @@ def generate_topic_with_gemini(data, perspective="summary"):
         if not data or len(data.strip()) < 10:
             print(f"[{datetime.now()}] No valid data for Gemini: {data}")
             return None
-        # Different prompts for different perspectives
+        # Different prompts for different perspectives with added creativity
         if perspective == "summary":
-            prompt = f"Analyze the following data and generate a concise blog topic summary of 50-100 words:\n\n{data}"
+            prompt = f"Analyze the following data and generate a concise blog topic summary of 50-100 words with a unique angle:\n\n{data}"
         elif perspective == "opinion":
-            prompt = f"Analyze the following data and generate a blog topic with an opinion or perspective in 50-100 words:\n\n{data}"
+            prompt = f"Analyze the following data and generate a blog topic with a creative opinion or bold perspective in 50-100 words:\n\n{data}"
         elif perspective == "question":
-            prompt = f"Analyze the following data and generate a blog topic in the form of a thought-provoking question in 50-100 words:\n\n{data}"
+            prompt = f"Analyze the following data and generate a blog topic as a thought-provoking question with an unusual twist in 50-100 words:\n\n{data}"
+        elif perspective == "narrative":
+            prompt = f"Analyze the following data and generate a blog topic in a storytelling style with a fresh narrative in 50-100 words:\n\n{data}"
+        elif perspective == "controversial":
+            prompt = f"Analyze the following data and generate a blog topic with a controversial or unconventional take in 50-100 words:\n\n{data}"
         response = model.generate_content(prompt)
         topic = response.text.strip()
         topic = topic.replace("**", "").replace("\n", " ")
@@ -199,7 +299,7 @@ def generate_multiple_topics(data, chunk_size=5, source_name=""):
     print(f"[{datetime.now()}] Filtered {len(data) - len(unique_data)} duplicate items from {source_name}")
 
     # Divide data into chunks
-    perspectives = ["summary", "opinion", "question"]
+    perspectives = ["summary", "opinion", "question", "narrative", "controversial"]
     for i in range(0, len(unique_data), chunk_size):
         chunk = unique_data[i:i + chunk_size]
         raw_text = " ".join(chunk)
