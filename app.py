@@ -84,6 +84,8 @@ def generate_topic_with_gemini(data):
         prompt = f"Analyze the following data and generate a concise blog topic summary of 50-100 words:\n\n{data}"
         response = model.generate_content(prompt)
         topic = response.text.strip()
+        # Remove any markdown symbols like ** from the topic
+        topic = topic.replace("**", "").replace("\n", " ")
         word_count = len(topic.split())
         if 50 <= word_count <= 100:
             print(f"[{datetime.now()}] Generated topic (words: {word_count}): {topic}")
@@ -122,26 +124,32 @@ def generate_multiple_topics(data, chunk_size=5, source_name=""):
     print(f"[{datetime.now()}] Generated {len(topics)} topics from {source_name}")
     return topics
 
-def fetch_facebook_posts():
-    url = "https://facebook-scraper3.p.rapidapi.com/page/posts"
-    querystring = {"page_id": "100064860875397"}
+def fetch_trending_social_media():
+    url = "https://social-media-trends-api.p.rapidapi.com/trends"
+    querystring = {"platform": "facebook", "limit": "20", "sort": "popularity", "order": "desc"}
     headers = {
         "x-rapidapi-key": RAPIDAPI_KEY,
-        "x-rapidapi-host": "facebook-scraper3.p.rapidapi.com"
+        "x-rapidapi-host": "social-media-trends-api.p.rapidapi.com"
     }
     try:
         response = requests.get(url, headers=headers, params=querystring)
         response.raise_for_status()
         data = response.json()
-        print(f"[{datetime.now()}] Facebook API response: {data}")
-        raw_data = data.get("results", [])
+        print(f"[{datetime.now()}] Social Media Trends API response: {data}")
+        raw_data = data.get("trends", [])
         if raw_data:
-            messages = [item.get("message", "") for item in raw_data if isinstance(item, dict) and item.get("message")]
-            return generate_multiple_topics(messages, chunk_size=3, source_name="Facebook posts")
-        print(f"[{datetime.now()}] No Facebook posts data found")
+            # Extract content and filter by timestamp for latest posts
+            contents = [item.get("content", "") for item in raw_data if item.get("content") and item.get("timestamp")]
+            # Sort by timestamp to get the latest posts
+            contents_with_time = [(item.get("content", ""), item.get("timestamp", 0)) for item in raw_data if item.get("content") and item.get("timestamp")]
+            contents_with_time.sort(key=lambda x: x[1], reverse=True)  # Latest first
+            latest_contents = [content for content, _ in contents_with_time]
+            print(f"[{datetime.now()}] Fetched trending social media data: {latest_contents[:100]}...")
+            return generate_multiple_topics(latest_contents, chunk_size=5, source_name="Social Media Trends")
+        print(f"[{datetime.now()}] No trending social media data found")
         return []
     except Exception as e:
-        print(f"[{datetime.now()}] Error in fetch_facebook_posts: {e}")
+        print(f"[{datetime.now()}] Error in fetch_trending_social_media: {e}")
         return []
 
 def fetch_news_topics():
@@ -200,7 +208,7 @@ def main():
     all_topics = set()
     details = []
     
-    for fetcher in [fetch_facebook_posts, fetch_news_topics, fetch_web_search]:
+    for fetcher in [fetch_trending_social_media, fetch_news_topics, fetch_web_search]:
         try:
             topics = fetcher()
             if topics:
