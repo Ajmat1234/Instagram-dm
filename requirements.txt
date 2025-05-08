@@ -1,6 +1,2 @@
-flask
-instagrapi
-pytz
-playwright
-gunicorn
-Pillow
+requests==2.31.0
+mysql-connector-python==8.3.0
