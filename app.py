@@ -3,6 +3,9 @@ import mysql.connector
 import google.generativeai as genai
 from datetime import datetime
 from flask import Flask, Response, jsonify
+import schedule
+import time
+import threading
 
 # Flask app
 app = Flask(__name__)
@@ -29,9 +32,9 @@ model = genai.GenerativeModel('gemini-1.5-flash')
 def health():
     return Response("OK", status=200)
 
-# Endpoint to fetch and save topics
-@app.route('/fetch-topics', methods=['GET'])
-def fetch_topics_endpoint():
+# Manual generate endpoint
+@app.route('/manual-generate', methods=['GET'])
+def manual_generate():
     try:
         result = main()
         return jsonify({"status": "success", "message": result})
@@ -53,11 +56,13 @@ def insert_topic(topic):
         if not cursor.fetchone():
             cursor.execute("INSERT INTO topics (title) VALUES (%s)", (topic,))
             conn.commit()
+            print(f"[{datetime.now()}] Inserted topic: {topic}")
+        else:
+            print(f"[{datetime.now()}] Topic already exists: {topic}")
         cursor.close()
         conn.close()
-        print(f"Inserted topic: {topic}")
     except Exception as e:
-        print(f"Error in insert_topic: {e}")
+        print(f"[{datetime.now()}] Error in insert_topic: {e}")
 
 def generate_topic_with_gemini(data):
     try:
@@ -66,13 +71,13 @@ def generate_topic_with_gemini(data):
         topic = response.text.strip()
         word_count = len(topic.split())
         if 50 <= word_count <= 100:
-            print(f"Generated topic (words: {word_count}): {topic}")
+            print(f"[{datetime.now()}] Generated topic (words: {word_count}): {topic}")
             return topic
         else:
-            print(f"Topic word count {word_count} out of range (50-100)")
+            print(f"[{datetime.now()}] Topic word count {word_count} out of range (50-100)")
             return None
     except Exception as e:
-        print(f"Error in generate_topic_with_gemini: {e}")
+        print(f"[{datetime.now()}] Error in generate_topic_with_gemini: {e}")
         return None
 
 def fetch_facebook_reels():
@@ -89,12 +94,12 @@ def fetch_facebook_reels():
         raw_data = data.get("data", [])
         if raw_data:
             raw_text = " ".join([item.get("title", "") for item in raw_data if isinstance(item, dict) and item.get("title")])
-            print("Fetched Facebook reels data")
+            print(f"[{datetime.now()}] Fetched Facebook reels data")
             return generate_topic_with_gemini(raw_text)
-        print("No Facebook reels data found")
+        print(f"[{datetime.now()}] No Facebook reels data found")
         return None
     except Exception as e:
-        print(f"Error in fetch_facebook_reels: {e}")
+        print(f"[{datetime.now()}] Error in fetch_facebook_reels: {e}")
         return None
 
 def fetch_news_topics():
@@ -117,22 +122,22 @@ def fetch_news_topics():
         raw_data = data.get("articles", [])
         if raw_data:
             raw_text = " ".join([item.get("title", "") for item in raw_data if item.get("title")])
-            print("Fetched news topics data")
+            print(f"[{datetime.now()}] Fetched news topics data")
             return generate_topic_with_gemini(raw_text)
-        print("No news topics data found")
+        print(f"[{datetime.now()}] No news topics data found")
         return None
     except Exception as e:
-        print(f"Error in fetch_news_topics: {e}")
+        print(f"[{datetime.now()}] Error in fetch_news_topics: {e}")
         return None
 
 def fetch_web_search():
-    url = "https://real-time-web-search.p.rapidapi.com/search"
+    url = "https	msg://real-time-web-search.p.rapidapi.com/search"
     headers = {
         "Content-Type": "application/json",
         "x-rapidapi-key": RAPIDAPI_KEY,
         "x-rapidapi-host": "real-time-web-search.p.rapidapi.com"
     }
-    queries = {
+    Queries = {
         "queries": ["chatgpt", "AI", "coding", "health", "world news"],
         "limit": "10"
     }
@@ -143,12 +148,12 @@ def fetch_web_search():
         raw_data = data.get("results", [])
         if raw_data:
             raw_text = " ".join([item.get("title", "") for item in raw_data if item.get("title")])
-            print("Fetched web search data")
+            print(f"[{datetime.now()}] Fetched web search data")
             return generate_topic_with_gemini(raw_text)
-        print("No web search data found")
+        print(f"[{datetime.now()}] No web search data found")
         return None
     except Exception as e:
-        print(f"Error in fetch_web_search: {e}")
+        print(f"[{datetime.now()}] Error in fetch_web_search: {e}")
         return None
 
 def main():
@@ -158,17 +163,32 @@ def main():
             topic = fetcher()
             if topic and topic.strip():
                 all_topics.add(topic)
-                print(f"Added topic from {fetcher.__name__}")
+                print(f"[{datetime.now()}] Added topic from {fetcher.__name__}")
             else:
-                print(f"No valid topic from {fetcher.__name__}")
+                print(f"[{datetime.now()}] No valid topic from {fetcher.__name__}")
         except Exception as e:
-            print(f"Error in {fetcher.__name__}: {e}")
+            print(f"[{datetime.now()}] Error in {fetcher.__name__}: {e}")
     
-    print(f"Fetched {len(all_topics)} unique topics.")
+    print(f"[{datetime.now()}] Fetched {len(all_topics)} unique topics.")
     for topic in all_topics:
         insert_topic(topic)
     return f"Fetched and saved {len(all_topics)} topics to database."
 
+# Auto-generate every 10 minutes
+def run_scheduler():
+    schedule.every(10).minutes.do(main)
+    while True:
+        schedule.run_pending()
+        time.sleep(60)  # Check every minute
+
+# Start scheduler in a separate thread
+def start_scheduler_thread():
+    scheduler_thread = threading.Thread(target=run_scheduler, daemon=True)
+    scheduler_thread.start()
+    print(f"[{datetime.now()}] Scheduler started: Running main() every 10 minutes.")
+
 if __name__ == "__main__":
+    # Start the scheduler
+    start_scheduler_thread()
     # Run Flask app
     app.run(host="0.0.0.0", port=10000)
