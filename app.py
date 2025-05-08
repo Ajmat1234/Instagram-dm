@@ -81,7 +81,7 @@ def generate_topic_with_gemini(data):
         if not data or len(data.strip()) < 10:
             print(f"[{datetime.now()}] No valid data for Gemini: {data}")
             return None
-        prompt = f"From the following data, generate a concise topic summary of 50-100 words:\n\n{data}"
+        prompt = f"Analyze the following data and generate a concise blog topic summary of 50-100 words:\n\n{data}"
         response = model.generate_content(prompt)
         topic = response.text.strip()
         word_count = len(topic.split())
@@ -89,13 +89,12 @@ def generate_topic_with_gemini(data):
             print(f"[{datetime.now()}] Generated topic (words: {word_count}): {topic}")
             return topic
         else:
-            # Fallback: Trim or expand topic to fit 50-100 words
             if word_count > 100:
                 topic = " ".join(topic.split()[:100])
                 print(f"[{datetime.now()}] Trimmed topic to 100 words: {topic}")
                 return topic
             elif word_count < 50:
-                topic += " " + "This summary provides insights into recent trends and updates in the given context."
+                topic += " This summary highlights key trends and insights for blog content creation."
                 word_count = len(topic.split())
                 if 50 <= word_count <= 100:
                     print(f"[{datetime.now()}] Expanded topic (words: {word_count}): {topic}")
@@ -105,6 +104,23 @@ def generate_topic_with_gemini(data):
     except Exception as e:
         print(f"[{datetime.now()}] Error in generate_topic_with_gemini: {e}")
         return None
+
+def generate_multiple_topics(data, chunk_size=5, source_name=""):
+    topics = []
+    if not data:
+        print(f"[{datetime.now()}] No data to generate topics for {source_name}")
+        return topics
+    
+    # Divide data into chunks
+    for i in range(0, len(data), chunk_size):
+        chunk = data[i:i + chunk_size]
+        raw_text = " ".join(chunk)
+        print(f"[{datetime.now()}] Processing chunk for {source_name}: {raw_text[:100]}...")
+        topic = generate_topic_with_gemini(raw_text)
+        if topic:
+            topics.append(topic)
+    print(f"[{datetime.now()}] Generated {len(topics)} topics from {source_name}")
+    return topics
 
 def fetch_facebook_posts():
     url = "https://facebook-scraper3.p.rapidapi.com/page/posts"
@@ -120,23 +136,20 @@ def fetch_facebook_posts():
         print(f"[{datetime.now()}] Facebook API response: {data}")
         raw_data = data.get("results", [])
         if raw_data:
-            raw_text = " ".join([item.get("message", "") for item in raw_data if isinstance(item, dict) and item.get("message")])
-            print(f"[{datetime.now()}] Fetched Facebook posts data: {raw_text[:100]}...")
-            return generate_topic_with_gemini(raw_text)
+            messages = [item.get("message", "") for item in raw_data if isinstance(item, dict) and item.get("message")]
+            return generate_multiple_topics(messages, chunk_size=3, source_name="Facebook posts")
         print(f"[{datetime.now()}] No Facebook posts data found")
-        return None
+        return []
     except Exception as e:
         print(f"[{datetime.now()}] Error in fetch_facebook_posts: {e}")
-        return None
+        return []
 
 def fetch_news_topics():
-    url = "https://real-time-news-data.p.rapidapi.com/topic-news-by-section"
+    url = "https://real-time-news-data.p.rapidapi.com/top-headlines"
     params = {
-        "topic": "TECHNOLOGY",
-        "section": "CAQiSkNCQVNNUW9JTDIwdk1EZGpNWFlTQldWdUxVZENHZ0pKVENJT0NBUWFDZ29JTDIwdk1ETnliSFFxQ2hJSUwyMHZNRE55YkhRb0FBKi4IACoqCAoiJENCQVNGUW9JTDIwdk1EZGpNWFlTQldWdUxVZENHZ0pKVENnQVABUAE",
-        "limit": "100",
         "country": "US",
-        "lang": "en"
+        "lang": "en",
+        "limit": "20"
     }
     headers = {
         "x-rapidapi-key": RAPIDAPI_KEY,
@@ -147,16 +160,15 @@ def fetch_news_topics():
         response.raise_for_status()
         data = response.json()
         print(f"[{datetime.now()}] News API response: {data}")
-        raw_data = data.get("data", {}).get("articles", [])
+        raw_data = data.get("data", [])
         if raw_data:
-            raw_text = " ".join([item.get("title", "") for item in raw_data if item.get("title")])
-            print(f"[{datetime.now()}] Fetched news topics data: {raw_text[:100]}...")
-            return generate_topic_with_gemini(raw_text)
+            titles = [item.get("title", "") for item in raw_data if item.get("title")]
+            return generate_multiple_topics(titles, chunk_size=5, source_name="News topics")
         print(f"[{datetime.now()}] No news topics data found")
-        return None
+        return []
     except Exception as e:
         print(f"[{datetime.now()}] Error in fetch_news_topics: {e}")
-        return None
+        return []
 
 def fetch_web_search():
     url = "https://real-time-web-search.p.rapidapi.com/search"
@@ -165,10 +177,9 @@ def fetch_web_search():
         "x-rapidapi-key": RAPIDAPI_KEY,
         "x-rapidapi-host": "real-time-web-search.p.rapidapi.com"
     }
-    # Simplified query for testing
     payload = {
         "q": "chatgpt OR AI OR coding OR health OR world news",
-        "limit": 10
+        "limit": 20
     }
     try:
         response = requests.get(url, headers=headers, params=payload)
@@ -177,14 +188,13 @@ def fetch_web_search():
         print(f"[{datetime.now()}] Web search API response: {data}")
         raw_data = data.get("data", [])
         if raw_data:
-            raw_text = " ".join([item.get("title", "") for item in raw_data if item.get("title")])
-            print(f"[{datetime.now()}] Fetched web search data: {raw_text[:100]}...")
-            return generate_topic_with_gemini(raw_text)
+            titles = [item.get("title", "") for item in raw_data if item.get("title")]
+            return generate_multiple_topics(titles, chunk_size=5, source_name="Web search")
         print(f"[{datetime.now()}] No web search data found")
-        return None
+        return []
     except Exception as e:
         print(f"[{datetime.now()}] Error in fetch_web_search: {e}")
-        return None
+        return []
 
 def main():
     all_topics = set()
@@ -192,11 +202,12 @@ def main():
     
     for fetcher in [fetch_facebook_posts, fetch_news_topics, fetch_web_search]:
         try:
-            topic = fetcher()
-            if topic and topic.strip():
-                all_topics.add(topic)
-                details.append(f"Success: Added topic from {fetcher.__name__}: {topic[:50]}...")
-                print(f"[{datetime.now()}] Added topic from {fetcher.__name__}")
+            topics = fetcher()
+            if topics:
+                for topic in topics:
+                    all_topics.add(topic)
+                    details.append(f"Success: Added topic from {fetcher.__name__}: {topic[:50]}...")
+                    print(f"[{datetime.now()}] Added topic from {fetcher.__name__}")
             else:
                 details.append(f"Failed: No valid topic from {fetcher.__name__}")
                 print(f"[{datetime.now()}] No valid topic from {fetcher.__name__}")
