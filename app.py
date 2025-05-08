@@ -89,8 +89,19 @@ def generate_topic_with_gemini(data):
             print(f"[{datetime.now()}] Generated topic (words: {word_count}): {topic}")
             return topic
         else:
-            print(f"[{datetime.now()}] Topic word count {word_count} out of range (50-100)")
-            return None
+            # Fallback: Trim or expand topic to fit 50-100 words
+            if word_count > 100:
+                topic = " ".join(topic.split()[:100])
+                print(f"[{datetime.now()}] Trimmed topic to 100 words: {topic}")
+                return topic
+            elif word_count < 50:
+                topic += " " + "This summary provides insights into recent trends and updates in the given context."
+                word_count = len(topic.split())
+                if 50 <= word_count <= 100:
+                    print(f"[{datetime.now()}] Expanded topic (words: {word_count}): {topic}")
+                    return topic
+                print(f"[{datetime.now()}] Topic word count {word_count} still out of range after expansion")
+                return None
     except Exception as e:
         print(f"[{datetime.now()}] Error in generate_topic_with_gemini: {e}")
         return None
@@ -136,7 +147,7 @@ def fetch_news_topics():
         response.raise_for_status()
         data = response.json()
         print(f"[{datetime.now()}] News API response: {data}")
-        raw_data = data.get("articles", [])
+        raw_data = data.get("data", {}).get("articles", [])
         if raw_data:
             raw_text = " ".join([item.get("title", "") for item in raw_data if item.get("title")])
             print(f"[{datetime.now()}] Fetched news topics data: {raw_text[:100]}...")
@@ -154,16 +165,17 @@ def fetch_web_search():
         "x-rapidapi-key": RAPIDAPI_KEY,
         "x-rapidapi-host": "real-time-web-search.p.rapidapi.com"
     }
-    queries = {
-        "queries": ["chatgpt", "AI", "coding", "health", "world news"],
-        "limit": "10"
+    # Simplified query for testing
+    payload = {
+        "q": "chatgpt OR AI OR coding OR health OR world news",
+        "limit": 10
     }
     try:
-        response = requests.post(url, headers=headers, json=queries)
+        response = requests.get(url, headers=headers, params=payload)
         response.raise_for_status()
         data = response.json()
         print(f"[{datetime.now()}] Web search API response: {data}")
-        raw_data = data.get("results", [])
+        raw_data = data.get("data", [])
         if raw_data:
             raw_text = " ".join([item.get("title", "") for item in raw_data if item.get("title")])
             print(f"[{datetime.now()}] Fetched web search data: {raw_text[:100]}...")
