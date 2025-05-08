@@ -2,9 +2,9 @@ import requests
 import mysql.connector
 import google.generativeai as genai
 from datetime import datetime
-from flask import Flask, Response
+from flask import Flask, Response, jsonify
 
-# Flask app for health check
+# Flask app
 app = Flask(__name__)
 
 # API Keys
@@ -29,6 +29,15 @@ model = genai.GenerativeModel('gemini-1.5-flash')
 def health():
     return Response("OK", status=200)
 
+# Endpoint to fetch and save topics
+@app.route('/fetch-topics', methods=['GET'])
+def fetch_topics_endpoint():
+    try:
+        result = main()
+        return jsonify({"status": "success", "message": result})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 def insert_topic(topic):
     try:
         conn = mysql.connector.connect(**db_config)
@@ -46,6 +55,7 @@ def insert_topic(topic):
             conn.commit()
         cursor.close()
         conn.close()
+        print(f"Inserted topic: {topic}")
     except Exception as e:
         print(f"Error in insert_topic: {e}")
 
@@ -54,9 +64,12 @@ def generate_topic_with_gemini(data):
         prompt = f"From the following data, generate a concise topic summary of 50-100 words:\n\n{data}"
         response = model.generate_content(prompt)
         topic = response.text.strip()
-        if 50 <= len(topic.split()) <= 100:
+        word_count = len(topic.split())
+        if 50 <= word_count <= 100:
+            print(f"Generated topic (words: {word_count}): {topic}")
             return topic
         else:
+            print(f"Topic word count {word_count} out of range (50-100)")
             return None
     except Exception as e:
         print(f"Error in generate_topic_with_gemini: {e}")
@@ -76,7 +89,9 @@ def fetch_facebook_reels():
         raw_data = data.get("data", [])
         if raw_data:
             raw_text = " ".join([item.get("title", "") for item in raw_data if isinstance(item, dict) and item.get("title")])
+            print("Fetched Facebook reels data")
             return generate_topic_with_gemini(raw_text)
+        print("No Facebook reels data found")
         return None
     except Exception as e:
         print(f"Error in fetch_facebook_reels: {e}")
@@ -102,7 +117,9 @@ def fetch_news_topics():
         raw_data = data.get("articles", [])
         if raw_data:
             raw_text = " ".join([item.get("title", "") for item in raw_data if item.get("title")])
+            print("Fetched news topics data")
             return generate_topic_with_gemini(raw_text)
+        print("No news topics data found")
         return None
     except Exception as e:
         print(f"Error in fetch_news_topics: {e}")
@@ -126,7 +143,9 @@ def fetch_web_search():
         raw_data = data.get("results", [])
         if raw_data:
             raw_text = " ".join([item.get("title", "") for item in raw_data if item.get("title")])
+            print("Fetched web search data")
             return generate_topic_with_gemini(raw_text)
+        print("No web search data found")
         return None
     except Exception as e:
         print(f"Error in fetch_web_search: {e}")
@@ -139,13 +158,17 @@ def main():
             topic = fetcher()
             if topic and topic.strip():
                 all_topics.add(topic)
+                print(f"Added topic from {fetcher.__name__}")
+            else:
+                print(f"No valid topic from {fetcher.__name__}")
         except Exception as e:
             print(f"Error in {fetcher.__name__}: {e}")
+    
     print(f"Fetched {len(all_topics)} unique topics.")
     for topic in all_topics:
         insert_topic(topic)
-    print("All topics saved to database.")
+    return f"Fetched and saved {len(all_topics)} topics to database."
 
 if __name__ == "__main__":
-    # Run Flask app for Render.com
+    # Run Flask app
     app.run(host="0.0.0.0", port=10000)
