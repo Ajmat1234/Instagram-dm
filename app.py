@@ -2,6 +2,10 @@ import requests
 import mysql.connector
 import google.generativeai as genai
 from datetime import datetime
+from flask import Flask, Response
+
+# Flask app for health check
+app = Flask(__name__)
 
 # API Keys
 RAPIDAPI_KEY = "e5609b396bmshc7f942bfe60c9cdp110cfcjsn8296e1012489"
@@ -19,6 +23,11 @@ db_config = {
 # Configure Gemini API
 genai.configure(api_key=GEMINI_API_KEY)
 model = genai.GenerativeModel('gemini-1.5-flash')
+
+# Health check endpoint
+@app.route('/health')
+def health():
+    return Response("OK", status=200)
 
 def insert_topic(topic):
     try:
@@ -125,7 +134,6 @@ def fetch_web_search():
 
 def main():
     all_topics = set()
-
     for fetcher in [fetch_facebook_reels, fetch_news_topics, fetch_web_search]:
         try:
             topic = fetcher()
@@ -133,11 +141,11 @@ def main():
                 all_topics.add(topic)
         except Exception as e:
             print(f"Error in {fetcher.__name__}: {e}")
-
     print(f"Fetched {len(all_topics)} unique topics.")
     for topic in all_topics:
         insert_topic(topic)
     print("All topics saved to database.")
 
 if __name__ == "__main__":
-    main()
+    # Run Flask app for Render.com
+    app.run(host="0.0.0.0", port=10000)
