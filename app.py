@@ -6,6 +6,8 @@ from flask import Flask, Response, jsonify
 import schedule
 import time
 import threading
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 
 # Flask app
 app = Flask(__name__)
@@ -53,7 +55,7 @@ def manual_generate():
             "details": []
         }), 500
 
-# New endpoint to fetch saved topics
+# Endpoint to fetch saved topics
 @app.route('/get-topics', methods=['GET'])
 def get_topics():
     try:
@@ -98,15 +100,20 @@ def insert_topic(topic):
     except Exception as e:
         print(f"[{datetime.now()}] Error in insert_topic: {e}")
 
-def generate_topic_with_gemini(data):
+def generate_topic_with_gemini(data, perspective="summary"):
     try:
         if not data or len(data.strip()) < 10:
             print(f"[{datetime.now()}] No valid data for Gemini: {data}")
             return None
-        prompt = f"Analyze the following data and generate a concise blog topic summary of 50-100 words:\n\n{data}"
+        # Different prompts for different perspectives
+        if perspective == "summary":
+            prompt = f"Analyze the following data and generate a concise blog topic summary of 50-100 words:\n\n{data}"
+        elif perspective == "opinion":
+            prompt = f"Analyze the following data and generate a blog topic with an opinion or perspective in 50-100 words:\n\n{data}"
+        elif perspective == "question":
+            prompt = f"Analyze the following data and generate a blog topic in the form of a thought-provoking question in 50-100 words:\n\n{data}"
         response = model.generate_content(prompt)
         topic = response.text.strip()
-        # Remove any markdown symbols like ** from the topic
         topic = topic.replace("**", "").replace("\n", " ")
         word_count = len(topic.split())
         if 50 <= word_count <= 100:
@@ -129,26 +136,71 @@ def generate_topic_with_gemini(data):
         print(f"[{datetime.now()}] Error in generate_topic_with_gemini: {e}")
         return None
 
+def filter_unique_items(items):
+    # Remove duplicates from raw data based on text similarity
+    if not items:
+        return []
+    vectorizer = TfidfVectorizer()
+    tfidf_matrix = vectorizer.fit_transform(items)
+    similarity_matrix = cosine_similarity(tfidf_matrix, tfidf_matrix)
+    unique_items = []
+    seen_indices = set()
+    for i in range(len(items)):
+        if i not in seen_indices:
+            unique_items.append(items[i])
+            # Mark similar items (similarity > 0.8) as seen
+            for j in range(len(items)):
+                if i != j and similarity_matrix[i][j] > 0.8:
+                    seen_indices.add(j)
+    return unique_items
+
+def filter_unique_topics(topics):
+    # Filter out similar topics based on text similarity
+    if not topics:
+        return []
+    vectorizer = TfidfVectorizer()
+    tfidf_matrix = vectorizer.fit_transform(topics)
+    similarity_matrix = cosine_similarity(tfidf_matrix, tfidf_matrix)
+    unique_topics = []
+    seen_indices = set()
+    for i in range(len(topics)):
+        if i not in seen_indices:
+            unique_topics.append(topics[i])
+            # Mark similar topics (similarity > 0.7) as seen
+            for j in range(len(topics)):
+                if i != j and similarity_matrix[i][j] > 0.7:
+                    seen_indices.add(j)
+    return unique_topics
+
 def generate_multiple_topics(data, chunk_size=5, source_name=""):
     topics = []
     if not data:
         print(f"[{datetime.now()}] No data to generate topics for {source_name}")
         return topics
     
+    # Filter unique items from raw data
+    unique_data = filter_unique_items(data)
+    print(f"[{datetime.now()}] Filtered {len(data) - len(unique_data)} duplicate items from {source_name}")
+
     # Divide data into chunks
-    for i in range(0, len(data), chunk_size):
-        chunk = data[i:i + chunk_size]
+    perspectives = ["summary", "opinion", "question"]
+    for i in range(0, len(unique_data), chunk_size):
+        chunk = unique_data[i:i + chunk_size]
         raw_text = " ".join(chunk)
         print(f"[{datetime.now()}] Processing chunk for {source_name}: {raw_text[:100]}...")
-        topic = generate_topic_with_gemini(raw_text)
-        if topic:
-            topics.append(topic)
-    print(f"[{datetime.now()}] Generated {len(topics)} topics from {source_name}")
-    return topics
+        # Generate topics with different perspectives
+        for idx, perspective in enumerate(perspectives):
+            topic = generate_topic_with_gemini(raw_text, perspective=perspective)
+            if topic:
+                topics.append(topic)
+    # Filter similar topics
+    unique_topics = filter_unique_topics(topics)
+    print(f"[{datetime.now()}] Generated {len(unique_topics)} unique topics from {source_name}")
+    return unique_topics
 
 def fetch_facebook_posts():
     # List of popular Facebook page IDs
-    page_ids = ["BBCNews", "NatGeo", "BuzzFeed", "CNN", "NYTimes"]
+    page_ids = ["100044534166687", "100064615539257", "100064849585551"]  # Updated page IDs (e.g., BBC News, National Geographic, BuzzFeed)
     all_posts = []
     headers = {
         "x-rapidapi-key": RAPIDAPI_KEY,
