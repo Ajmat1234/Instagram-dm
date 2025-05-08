@@ -1,5 +1,6 @@
+flask
 requests
 mysql-connector-python
 google-generativeai
-flask
 schedule
+scikit-learn
