@@ -24,8 +24,12 @@ db_config = {
 }
 
 # Configure Gemini API
-genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel('gemini-1.5-flash')
+try:
+    genai.configure(api_key=GEMINI_API_KEY)
+    model = genai.GenerativeModel('gemini-1.5-flash')
+    print(f"[{datetime.now()}] Gemini API configured successfully")
+except Exception as e:
+    print(f"[{datetime.now()}] Error configuring Gemini API: {e}")
 
 # Health check endpoint
 @app.route('/health')
@@ -36,10 +40,18 @@ def health():
 @app.route('/manual-generate', methods=['GET'])
 def manual_generate():
     try:
-        result = main()
-        return jsonify({"status": "success", "message": result})
+        result, details = main()
+        return jsonify({
+            "status": "success",
+            "message": result,
+            "details": details
+        })
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return jsonify({
+            "status": "error",
+            "message": str(e),
+            "details": []
+        }), 500
 
 def insert_topic(topic):
     try:
@@ -66,6 +78,9 @@ def insert_topic(topic):
 
 def generate_topic_with_gemini(data):
     try:
+        if not data or len(data.strip()) < 10:
+            print(f"[{datetime.now()}] No valid data for Gemini: {data}")
+            return None
         prompt = f"From the following data, generate a concise topic summary of 50-100 words:\n\n{data}"
         response = model.generate_content(prompt)
         topic = response.text.strip()
@@ -91,10 +106,11 @@ def fetch_facebook_reels():
         response = requests.get(url, headers=headers, params=querystring)
         response.raise_for_status()
         data = response.json()
+        print(f"[{datetime.now()}] Facebook API response: {data}")
         raw_data = data.get("data", [])
         if raw_data:
             raw_text = " ".join([item.get("title", "") for item in raw_data if isinstance(item, dict) and item.get("title")])
-            print(f"[{datetime.now()}] Fetched Facebook reels data")
+            print(f"[{datetime.now()}] Fetched Facebook reels data: {raw_text[:100]}...")
             return generate_topic_with_gemini(raw_text)
         print(f"[{datetime.now()}] No Facebook reels data found")
         return None
@@ -119,10 +135,11 @@ def fetch_news_topics():
         response = requests.get(url, headers=headers, params=params)
         response.raise_for_status()
         data = response.json()
+        print(f"[{datetime.now()}] News API response: {data}")
         raw_data = data.get("articles", [])
         if raw_data:
             raw_text = " ".join([item.get("title", "") for item in raw_data if item.get("title")])
-            print(f"[{datetime.now()}] Fetched news topics data")
+            print(f"[{datetime.now()}] Fetched news topics data: {raw_text[:100]}...")
             return generate_topic_with_gemini(raw_text)
         print(f"[{datetime.now()}] No news topics data found")
         return None
@@ -131,13 +148,13 @@ def fetch_news_topics():
         return None
 
 def fetch_web_search():
-    url = "https	msg://real-time-web-search.p.rapidapi.com/search"
+    url = "https://real-time-web-search.p.rapidapi.com/search"
     headers = {
         "Content-Type": "application/json",
         "x-rapidapi-key": RAPIDAPI_KEY,
         "x-rapidapi-host": "real-time-web-search.p.rapidapi.com"
     }
-    Queries = {
+    queries = {
         "queries": ["chatgpt", "AI", "coding", "health", "world news"],
         "limit": "10"
     }
@@ -145,10 +162,11 @@ def fetch_web_search():
         response = requests.post(url, headers=headers, json=queries)
         response.raise_for_status()
         data = response.json()
+        print(f"[{datetime.now()}] Web search API response: {data}")
         raw_data = data.get("results", [])
         if raw_data:
             raw_text = " ".join([item.get("title", "") for item in raw_data if item.get("title")])
-            print(f"[{datetime.now()}] Fetched web search data")
+            print(f"[{datetime.now()}] Fetched web search data: {raw_text[:100]}...")
             return generate_topic_with_gemini(raw_text)
         print(f"[{datetime.now()}] No web search data found")
         return None
@@ -158,24 +176,31 @@ def fetch_web_search():
 
 def main():
     all_topics = set()
+    details = []
+    
     for fetcher in [fetch_facebook_reels, fetch_news_topics, fetch_web_search]:
         try:
             topic = fetcher()
             if topic and topic.strip():
                 all_topics.add(topic)
+                details.append(f"Success: Added topic from {fetcher.__name__}: {topic[:50]}...")
                 print(f"[{datetime.now()}] Added topic from {fetcher.__name__}")
             else:
+                details.append(f"Failed: No valid topic from {fetcher.__name__}")
                 print(f"[{datetime.now()}] No valid topic from {fetcher.__name__}")
         except Exception as e:
+            details.append(f"Error in {fetcher.__name__}: {str(e)}")
             print(f"[{datetime.now()}] Error in {fetcher.__name__}: {e}")
     
     print(f"[{datetime.now()}] Fetched {len(all_topics)} unique topics.")
     for topic in all_topics:
         insert_topic(topic)
-    return f"Fetched and saved {len(all_topics)} topics to database."
+    
+    return f"Fetched and saved {len(all_topics)} topics to database.", details
 
 # Auto-generate every 10 minutes
 def run_scheduler():
+    print(f"[{datetime.now()}] Scheduler running...")
     schedule.every(10).minutes.do(main)
     while True:
         schedule.run_pending()
