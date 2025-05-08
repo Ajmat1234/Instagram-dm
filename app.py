@@ -95,8 +95,8 @@ def generate_topic_with_gemini(data):
         print(f"[{datetime.now()}] Error in generate_topic_with_gemini: {e}")
         return None
 
-def fetch_facebook_reels():
-    url = "https://facebook-scraper3.p.rapidapi.com/page/reels"
+def fetch_facebook_posts():
+    url = "https://facebook-scraper3.p.rapidapi.com/page/posts"
     querystring = {"page_id": "100064860875397"}
     headers = {
         "x-rapidapi-key": RAPIDAPI_KEY,
@@ -107,15 +107,15 @@ def fetch_facebook_reels():
         response.raise_for_status()
         data = response.json()
         print(f"[{datetime.now()}] Facebook API response: {data}")
-        raw_data = data.get("data", [])
+        raw_data = data.get("results", [])
         if raw_data:
-            raw_text = " ".join([item.get("title", "") for item in raw_data if isinstance(item, dict) and item.get("title")])
-            print(f"[{datetime.now()}] Fetched Facebook reels data: {raw_text[:100]}...")
+            raw_text = " ".join([item.get("message", "") for item in raw_data if isinstance(item, dict) and item.get("message")])
+            print(f"[{datetime.now()}] Fetched Facebook posts data: {raw_text[:100]}...")
             return generate_topic_with_gemini(raw_text)
-        print(f"[{datetime.now()}] No Facebook reels data found")
+        print(f"[{datetime.now()}] No Facebook posts data found")
         return None
     except Exception as e:
-        print(f"[{datetime.now()}] Error in fetch_facebook_reels: {e}")
+        print(f"[{datetime.now()}] Error in fetch_facebook_posts: {e}")
         return None
 
 def fetch_news_topics():
@@ -178,7 +178,7 @@ def main():
     all_topics = set()
     details = []
     
-    for fetcher in [fetch_facebook_reels, fetch_news_topics, fetch_web_search]:
+    for fetcher in [fetch_facebook_posts, fetch_news_topics, fetch_web_search]:
         try:
             topic = fetcher()
             if topic and topic.strip():
