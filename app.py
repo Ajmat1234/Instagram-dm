@@ -88,17 +88,33 @@ def insert_topic(topic):
                 added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
-        cursor.execute("SELECT title FROM topics WHERE title = %s", (topic,))
-        if not cursor.fetchone():
-            cursor.execute("INSERT INTO topics (title) VALUES (%s)", (topic,))
-            conn.commit()
-            print(f"[{datetime.now()}] Inserted topic: {topic}")
-        else:
-            print(f"[{datetime.now()}] Topic already exists: {topic}")
+        # Fetch existing topics from database
+        cursor.execute("SELECT title FROM topics")
+        existing_topics = [row[0] for row in cursor.fetchall()]
+        
+        # Check similarity with existing topics
+        if existing_topics:
+            vectorizer = TfidfVectorizer()
+            all_texts = existing_topics + [topic]
+            tfidf_matrix = vectorizer.fit_transform(all_texts)
+            similarity_matrix = cosine_similarity(tfidf_matrix[-1], tfidf_matrix[:-1])
+            max_similarity = similarity_matrix.max()
+            if max_similarity > 0.7:
+                print(f"[{datetime.now()}] Topic too similar to existing (similarity: {max_similarity}): {topic}")
+                cursor.close()
+                conn.close()
+                return False
+        
+        # Insert if not similar
+        cursor.execute("INSERT INTO topics (title) VALUES (%s)", (topic,))
+        conn.commit()
+        print(f"[{datetime.now()}] Inserted topic: {topic}")
         cursor.close()
         conn.close()
+        return True
     except Exception as e:
         print(f"[{datetime.now()}] Error in insert_topic: {e}")
+        return False
 
 def generate_topic_with_gemini(data, perspective="summary"):
     try:
@@ -198,62 +214,6 @@ def generate_multiple_topics(data, chunk_size=5, source_name=""):
     print(f"[{datetime.now()}] Generated {len(unique_topics)} unique topics from {source_name}")
     return unique_topics
 
-def fetch_facebook_posts():
-    # List of popular Facebook page IDs
-    page_ids = ["100044534166687", "100064615539257", "100064849585551"]  # Updated page IDs (e.g., BBC News, National Geographic, BuzzFeed)
-    all_posts = []
-    headers = {
-        "x-rapidapi-key": RAPIDAPI_KEY,
-        "x-rapidapi-host": "facebook-scraper3.p.rapidapi.com"
-    }
-    try:
-        for page_id in page_ids:
-            url = "https://facebook-scraper3.p.rapidapi.com/page/posts"
-            querystring = {"page_id": page_id}
-            response = requests.get(url, headers=headers, params=querystring)
-            response.raise_for_status()
-            data = response.json()
-            print(f"[{datetime.now()}] Facebook API response for {page_id}: {data}")
-            raw_data = data.get("results", [])
-            if raw_data:
-                posts = [(item.get("message", ""), item.get("timestamp", 0)) for item in raw_data if item.get("message") and item.get("timestamp")]
-                all_posts.extend(posts)
-        
-        if all_posts:
-            # Sort by timestamp to get the latest posts
-            all_posts.sort(key=lambda x: x[1], reverse=True)  # Latest first
-            latest_contents = [post for post, _ in all_posts]
-            print(f"[{datetime.now()}] Fetched Facebook posts data: {latest_contents[:100]}...")
-            return generate_multiple_topics(latest_contents, chunk_size=5, source_name="Facebook posts")
-        print(f"[{datetime.now()}] No Facebook posts data found")
-        return []
-    except Exception as e:
-        print(f"[{datetime.now()}] Error in fetch_facebook_posts: {e}")
-        return []
-
-def fetch_twitter_trends():
-    url = "https://twitter-trends5.p.rapidapi.com/twitter/api/trends"
-    querystring = {"woeid": "23424977"}  # WOEID for worldwide trends
-    headers = {
-        "x-rapidapi-key": RAPIDAPI_KEY,
-        "x-rapidapi-host": "twitter-trends5.p.rapidapi.com"
-    }
-    try:
-        response = requests.get(url, headers=headers, params=querystring)
-        response.raise_for_status()
-        data = response.json()
-        print(f"[{datetime.now()}] Twitter Trends API response: {data}")
-        raw_data = data.get("trends", [])
-        if raw_data:
-            trends = [item.get("name", "") for item in raw_data if item.get("name")]
-            print(f"[{datetime.now()}] Fetched Twitter trends data: {trends[:100]}...")
-            return generate_multiple_topics(trends, chunk_size=5, source_name="Twitter trends")
-        print(f"[{datetime.now()}] No Twitter trends data found")
-        return []
-    except Exception as e:
-        print(f"[{datetime.now()}] Error in fetch_twitter_trends: {e}")
-        return []
-
 def fetch_news_topics():
     url = "https://real-time-news-data.p.rapidapi.com/top-headlines"
     params = {
@@ -310,7 +270,7 @@ def main():
     all_topics = set()
     details = []
     
-    for fetcher in [fetch_facebook_posts, fetch_twitter_trends, fetch_news_topics, fetch_web_search]:
+    for fetcher in [fetch_news_topics, fetch_web_search]:
         try:
             topics = fetcher()
             if topics:
@@ -325,16 +285,19 @@ def main():
             details.append(f"Error in {fetcher.__name__}: {str(e)}")
             print(f"[{datetime.now()}] Error in {fetcher.__name__}: {e}")
     
-    print(f"[{datetime.now()}] Fetched {len(all_topics)} unique topics.")
+    print(f"[{datetime.now()}] Fetched {len(all_topics)} unique topics before final filtering.")
+    # Final insertion with duplicate check
+    saved_count = 0
     for topic in all_topics:
-        insert_topic(topic)
+        if insert_topic(topic):
+            saved_count += 1
     
-    return f"Fetched and saved {len(all_topics)} topics to database.", details
+    return f"Fetched and saved {saved_count} topics to database.", details
 
-# Auto-generate every 10 minutes
+# Auto-generate every 30 minutes
 def run_scheduler():
     print(f"[{datetime.now()}] Scheduler running...")
-    schedule.every(10).minutes.do(main)
+    schedule.every(30).minutes.do(main)
     while True:
         schedule.run_pending()
         time.sleep(60)  # Check every minute
@@ -343,7 +306,7 @@ def run_scheduler():
 def start_scheduler_thread():
     scheduler_thread = threading.Thread(target=run_scheduler, daemon=True)
     scheduler_thread.start()
-    print(f"[{datetime.now()}] Scheduler started: Running main() every 10 minutes.")
+    print(f"[{datetime.now()}] Scheduler started: Running main() every 30 minutes.")
 
 if __name__ == "__main__":
     # Start the scheduler
