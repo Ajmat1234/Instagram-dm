@@ -1,8 +1,11 @@
 import requests
 import mysql.connector
+import google.generativeai as genai
 from datetime import datetime
 
+# API Keys
 RAPIDAPI_KEY = "e5609b396bmshc7f942bfe60c9cdp110cfcjsn8296e1012489"
+GEMINI_API_KEY = "AIzaSyALVGk-yBmkohV6Wqei63NARTd9xD-O7TI"
 
 # MySQL config
 db_config = {
@@ -13,22 +16,42 @@ db_config = {
     "port": 3306
 }
 
+# Configure Gemini API
+genai.configure(api_key=GEMINI_API_KEY)
+model = genai.GenerativeModel('gemini-1.5-flash')
+
 def insert_topic(topic):
-    conn = mysql.connector.connect(**db_config)
-    cursor = conn.cursor()
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS topics (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            title TEXT,
-            added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-    cursor.execute("SELECT title FROM topics WHERE title = %s", (topic,))
-    if not cursor.fetchone():
-        cursor.execute("INSERT INTO topics (title) VALUES (%s)", (topic,))
-        conn.commit()
-    cursor.close()
-    conn.close()
+    try:
+        conn = mysql.connector.connect(**db_config)
+        cursor = conn.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS topics (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                title TEXT,
+                added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        cursor.execute("SELECT title FROM topics WHERE title = %s", (topic,))
+        if not cursor.fetchone():
+            cursor.execute("INSERT INTO topics (title) VALUES (%s)", (topic,))
+            conn.commit()
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        print(f"Error in insert_topic: {e}")
+
+def generate_topic_with_gemini(data):
+    try:
+        prompt = f"From the following data, generate a concise topic summary of 50-100 words:\n\n{data}"
+        response = model.generate_content(prompt)
+        topic = response.text.strip()
+        if 50 <= len(topic.split()) <= 100:
+            return topic
+        else:
+            return None
+    except Exception as e:
+        print(f"Error in generate_topic_with_gemini: {e}")
+        return None
 
 def fetch_facebook_reels():
     url = "https://facebook-scraper3.p.rapidapi.com/page/reels"
@@ -41,14 +64,14 @@ def fetch_facebook_reels():
         response = requests.get(url, headers=headers, params=querystring)
         response.raise_for_status()
         data = response.json()
-        if isinstance(data, dict):
-            return [item.get("title", "") for item in data.get("data", []) if isinstance(item, dict) and item.get("title")]
-        else:
-            print("Unexpected Facebook reels response format:", data)
-            return []
+        raw_data = data.get("data", [])
+        if raw_data:
+            raw_text = " ".join([item.get("title", "") for item in raw_data if isinstance(item, dict) and item.get("title")])
+            return generate_topic_with_gemini(raw_text)
+        return None
     except Exception as e:
         print(f"Error in fetch_facebook_reels: {e}")
-        return []
+        return None
 
 def fetch_news_topics():
     url = "https://real-time-news-data.p.rapidapi.com/topic-news-by-section"
@@ -67,10 +90,14 @@ def fetch_news_topics():
         response = requests.get(url, headers=headers, params=params)
         response.raise_for_status()
         data = response.json()
-        return [item.get("title", "") for item in data.get("articles", []) if item.get("title")]
+        raw_data = data.get("articles", [])
+        if raw_data:
+            raw_text = " ".join([item.get("title", "") for item in raw_data if item.get("title")])
+            return generate_topic_with_gemini(raw_text)
+        return None
     except Exception as e:
         print(f"Error in fetch_news_topics: {e}")
-        return []
+        return None
 
 def fetch_web_search():
     url = "https://real-time-web-search.p.rapidapi.com/search"
@@ -87,18 +114,23 @@ def fetch_web_search():
         response = requests.post(url, headers=headers, json=queries)
         response.raise_for_status()
         data = response.json()
-        return [item.get("title", "") for item in data.get("results", []) if item.get("title")]
+        raw_data = data.get("results", [])
+        if raw_data:
+            raw_text = " ".join([item.get("title", "") for item in raw_data if item.get("title")])
+            return generate_topic_with_gemini(raw_text)
+        return None
     except Exception as e:
         print(f"Error in fetch_web_search: {e}")
-        return []
+        return None
 
 def main():
     all_topics = set()
 
     for fetcher in [fetch_facebook_reels, fetch_news_topics, fetch_web_search]:
         try:
-            topics = fetcher()
-            all_topics.update([t.strip() for t in topics if t.strip()])
+            topic = fetcher()
+            if topic and topic.strip():
+                all_topics.add(topic)
         except Exception as e:
             print(f"Error in {fetcher.__name__}: {e}")
 
