@@ -16,7 +16,13 @@ db_config = {
 def insert_topic(topic):
     conn = mysql.connector.connect(**db_config)
     cursor = conn.cursor()
-    cursor.execute("CREATE TABLE IF NOT EXISTS topics (id INT AUTO_INCREMENT PRIMARY KEY, title TEXT, added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)")
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS topics (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            title TEXT,
+            added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
     cursor.execute("SELECT title FROM topics WHERE title = %s", (topic,))
     if not cursor.fetchone():
         cursor.execute("INSERT INTO topics (title) VALUES (%s)", (topic,))
@@ -31,9 +37,18 @@ def fetch_facebook_reels():
         "x-rapidapi-key": RAPIDAPI_KEY,
         "x-rapidapi-host": "facebook-scraper3.p.rapidapi.com"
     }
-    response = requests.get(url, headers=headers, params=querystring)
-    data = response.json()
-    return [item.get("title", "") for item in data if item.get("title")]
+    try:
+        response = requests.get(url, headers=headers, params=querystring)
+        response.raise_for_status()
+        data = response.json()
+        if isinstance(data, dict):
+            return [item.get("title", "") for item in data.get("data", []) if isinstance(item, dict) and item.get("title")]
+        else:
+            print("Unexpected Facebook reels response format:", data)
+            return []
+    except Exception as e:
+        print(f"Error in fetch_facebook_reels: {e}")
+        return []
 
 def fetch_news_topics():
     url = "https://real-time-news-data.p.rapidapi.com/topic-news-by-section"
@@ -48,9 +63,14 @@ def fetch_news_topics():
         "x-rapidapi-key": RAPIDAPI_KEY,
         "x-rapidapi-host": "real-time-news-data.p.rapidapi.com"
     }
-    response = requests.get(url, headers=headers, params=params)
-    data = response.json()
-    return [item.get("title", "") for item in data.get("articles", []) if item.get("title")]
+    try:
+        response = requests.get(url, headers=headers, params=params)
+        response.raise_for_status()
+        data = response.json()
+        return [item.get("title", "") for item in data.get("articles", []) if item.get("title")]
+    except Exception as e:
+        print(f"Error in fetch_news_topics: {e}")
+        return []
 
 def fetch_web_search():
     url = "https://real-time-web-search.p.rapidapi.com/search"
@@ -63,9 +83,14 @@ def fetch_web_search():
         "queries": ["chatgpt", "AI", "coding", "health", "world news"],
         "limit": "10"
     }
-    response = requests.post(url, headers=headers, json=queries)
-    data = response.json()
-    return [item.get("title", "") for item in data.get("results", []) if item.get("title")]
+    try:
+        response = requests.post(url, headers=headers, json=queries)
+        response.raise_for_status()
+        data = response.json()
+        return [item.get("title", "") for item in data.get("results", []) if item.get("title")]
+    except Exception as e:
+        print(f"Error in fetch_web_search: {e}")
+        return []
 
 def main():
     all_topics = set()
