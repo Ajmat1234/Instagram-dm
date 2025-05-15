@@ -13,6 +13,7 @@ INDEXNOW_KEY = "0e06de419d2847e486f3c9ca7097931d"
 KEY_LOCATION = f"https://work-lyart-rho.vercel.app/{INDEXNOW_KEY}.txt"
 HOST = "work-lyart-rho.vercel.app"
 SUBMITTED_URLS_FILE = "submitted_urls.json"
+INDEXNOW_API = "https://api.indexnow.org/indexnow"
 
 def load_submitted_urls():
     if os.path.exists(SUBMITTED_URLS_FILE):
@@ -36,11 +37,16 @@ def extract_urls_from_sitemap(sitemap_url):
         return []
 
 def submit_url_to_indexnow(url):
+    payload = {
+        "host": HOST,
+        "key": INDEXNOW_KEY,
+        "keyLocation": KEY_LOCATION,
+        "urlList": [url]
+    }
     try:
-        response = requests.get(
-            "https://www.bing.com/indexnow",
-            params={"url": url, "key": INDEXNOW_KEY}
-        )
+        response = requests.post(INDEXNOW_API, json=payload, headers={
+            "Content-Type": "application/json"
+        })
         print(f"Submitted: {url} | Status: {response.status_code}")
         return response.status_code == 200
     except Exception as e:
@@ -60,16 +66,16 @@ def indexnow_worker():
             if success:
                 submitted_urls.add(url)
                 save_submitted_urls(submitted_urls)
-            time.sleep(3)  # prevent spam to Bing
+            time.sleep(2)  # avoid too many rapid requests
         print("Sleeping for 2 hours...\n")
         time.sleep(2 * 60 * 60)
 
-# background thread to keep submitting
+# background thread to keep it running
 threading.Thread(target=indexnow_worker, daemon=True).start()
 
 @app.route("/")
 def home():
-    return "IndexNow Pinger is running."
+    return "IndexNow Pinger is running (POST version)."
 
 @app.route("/ping")
 def ping():
