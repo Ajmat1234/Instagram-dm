@@ -12,7 +12,7 @@ SITEMAP_URL = "https://work-lyart-rho.vercel.app/sitemap.xml"
 INDEXNOW_KEY = "0e06de419d2847e486f3c9ca7097931d"
 KEY_LOCATION = f"https://work-lyart-rho.vercel.app/{INDEXNOW_KEY}.txt"
 HOST = "work-lyart-rho.vercel.app"
-SUBMITTED_URLS_FILE = "submitted_urls.json"
+SUBMITTED_URLS_FILE = "/tmp/submitted_urls.json"  # instead of current directory
 INDEXNOW_API = "https://api.indexnow.org/indexnow"
 
 def load_submitted_urls():
