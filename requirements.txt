@@ -1,7 +1,2 @@
-flask
+Flask
 requests
-mysql-connector-python
-google-generativeai
-schedule
-scikit-learn
-nltk
